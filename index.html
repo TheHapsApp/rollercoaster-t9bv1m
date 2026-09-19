@@ -468,14 +468,17 @@
 
     // ---------------- computer-built templates ----------------
     function noLoops(len) { return new Array(len || TRACK_COLS).fill(false); }
-    function loopsAt(idxs) { var a = noLoops(); idxs.forEach(function (i) { a[i] = true; }); return a; }
+    function loopsAt(idxs, len) { var a = noLoops(len); idxs.forEach(function (i) { a[i] = true; }); return a; }
     var COMPUTER_COASTERS = [
       // These three are built to evoke real Lagoon coasters' signature moments — Cannibal's
       // beyond-vertical launch drop, Wicked's twisting dive off the lift, Colossus's long classic
       // wooden-coaster profile — not a literal survey-accurate trace, just a genuine best effort at
       // the real shape and feel within what a simple height-per-column track can represent.
-      { id: "cannibal", name: "Cannibal", emoji: "👹", loops: noLoops(),
-        heights: [2,3,20,20,2,4,14,3,11,3,9,3,7,3,5,3,4,3,3,2,2,2,2,2] },
+      // Real Cannibal, per a closer description: an elevator-style vertical lift tower (not a
+      // diagonal chain lift), a beyond-vertical first drop, two closely-linked loops right after
+      // each other, an irregular "funky" stretch, and one more circular element before the brakes.
+      { id: "cannibal", name: "Cannibal", emoji: "👹", loops: loopsAt([7, 10, 20], 30),
+        heights: [2,2,20,20,2,4,12,12,4,11,11,3,9,3,8,6,2,7,3,10,10,4,6,3,4,3,3,2,2,2] },
       // Real Wicked: launches out of a dark tunnel, straight up a near-vertical spike, then a
       // twisting run of turns — not an inversion, so no loop flag here (an earlier version wrongly
       // approximated it with one; fixed per a closer description of the real ride).
