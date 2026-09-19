@@ -40,8 +40,8 @@
   .topBar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .topBar .title { font-weight: bold; font-size: 1.05rem; }
 
-  #builderWrap { width: 100%; aspect-ratio: 24/11; border: 4px solid #fff; border-radius: 14px; overflow: hidden; background: #12163a; }
-  #builderCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
+  #builderWrap { width: 100%; height: 260px; border: 4px solid #fff; border-radius: 14px; overflow: auto; background: #12163a; }
+  #builderCanvas { display: block; touch-action: none; }
   .modeRow { display: flex; justify-content: center; gap: 6px; margin: 10px 0; }
 
   #rideWrap { width: 100%; aspect-ratio: 16/9; border: 4px solid #fff; border-radius: 14px; overflow: hidden; position: relative; background: #000; }
@@ -178,11 +178,15 @@
     </div>
     <div id="builderWrap"><canvas id="builderCanvas"></canvas></div>
     <div class="modeRow">
+      <button class="btn small" id="addTrackBtn">➕ Add More Track</button>
+      <button class="btn small" id="removeTrackBtn">➖ Remove End</button>
+    </div>
+    <div class="modeRow">
       <button class="btn" id="modeDrawBtn">✏️ Draw Track</button>
       <button class="btn" id="modeEraseBtn">🗑️ Erase (Make a Gap!)</button>
       <button class="btn" id="modeLoopBtn">🔁 Loop the Loop!</button>
     </div>
-    <div style="font-size:0.8rem; opacity:0.85; margin-bottom:8px;">Drag up and down to build hills. Erase a spot to leave a gap — go on too fast and you'll fly right off! 💥 Tap a spot in Loop mode to add a loop-the-loop!</div>
+    <div style="font-size:0.8rem; opacity:0.85; margin-bottom:8px;">Drag up and down to build hills — scroll to build super tall! Erase a spot to leave a gap. Tap in Loop mode to add a loop-the-loop. Make it as long as you want with "Add More Track"!</div>
     <div style="margin-top:8px;">Name your coaster:</div>
     <input type="text" id="coasterNameInput" maxlength="24" placeholder="My Awesome Coaster">
   </div>
@@ -322,8 +326,10 @@
     var SUPABASE_KEY = "sb_publishable_K9NzviZwqhmT3Dkium3TXg_jceFIfbe";
     var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    var TRACK_COLS = 24;
-    var MIN_HEIGHT = 1, MAX_HEIGHT = 7, DEFAULT_HEIGHT = 3;
+    var TRACK_COLS = 24; // starting length for a brand new blank coaster — tracks can grow past this, see ADD_TRACK_CHUNK
+    var ADD_TRACK_CHUNK = 8; // how many columns "Add More Track" appends at a time
+    var MAX_TRACK_COLS = 200; // a practical ceiling (not a creative one) so a track can't grow into something the phone can't render/scroll
+    var MIN_HEIGHT = 1, MAX_HEIGHT = 20, DEFAULT_HEIGHT = 3;
     var MY_TRACK_KEY = "coasterPartyMyTrack";
     var MY_TRACK_LOOPS_KEY = "coasterPartyMyTrackLoops";
 
@@ -374,7 +380,7 @@
       try {
         var raw = window.localStorage.getItem(MY_TRACK_KEY);
         var parsed = raw ? JSON.parse(raw) : null;
-        if (Array.isArray(parsed) && parsed.length === TRACK_COLS) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 2) return parsed; // any length now — tracks can be longer or shorter than the old fixed 24
       } catch (e) {}
       return null;
     }
@@ -385,7 +391,7 @@
       try {
         var raw = window.localStorage.getItem(MY_TRACK_LOOPS_KEY);
         var parsed = raw ? JSON.parse(raw) : null;
-        if (Array.isArray(parsed) && parsed.length === TRACK_COLS) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 2) return parsed;
       } catch (e) {}
       return null;
     }
@@ -408,7 +414,7 @@
     }
 
     // ---------------- computer-built templates ----------------
-    function noLoops() { return new Array(TRACK_COLS).fill(false); }
+    function noLoops(len) { return new Array(len || TRACK_COLS).fill(false); }
     function loopsAt(idxs) { var a = noLoops(); idxs.forEach(function (i) { a[i] = true; }); return a; }
     var COMPUTER_COASTERS = [
       { id: "wavy", name: "Wavy Wonder", emoji: "🌊", loops: noLoops(),
@@ -505,7 +511,7 @@
       rideHeights = heights;
       rideFallback = fallbackHeights(heights);
       rideTimeline = buildRideTimeline(rideFallback);
-      rideLoops = loops || noLoops();
+      rideLoops = loops || noLoops(heights.length);
       rideCrashed = false; rideFinished = false;
       rideStartPerf = performance.now() - Math.max(0, startAtElapsedSec || 0) * 1000;
       rideCoasterName = name || "";
@@ -552,20 +558,25 @@
       }
 
       var cameraX = rideCrashed ? (crashWorldX - CANVAS_W / 2) : (cartWX - CANVAS_W / 2);
-      cameraX = clampNum(cameraX, 0, Math.max(0, worldX(TRACK_COLS - 1) - CANVAS_W + WORLD_STEP));
+      cameraX = clampNum(cameraX, 0, Math.max(0, worldX(rideHeights.length - 1) - CANVAS_W + WORLD_STEP));
+      // Vertical camera-follow — tall builds (loops raise the effective height too) would otherwise
+      // draw their peaks above the top of a fixed-height canvas. Stays at 0 (ground fixed exactly
+      // where it always was) until the cart climbs high enough to need it, so short/typical coasters
+      // are pixel-identical to before this existed.
+      var cameraY = Math.min(0, cartWY - CANVAS_H * 0.4);
 
       // track
       ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.strokeStyle = "#3a2a5e";
       for (var i = 0; i < rideHeights.length - 1; i++) {
         if (rideHeights[i] == null || rideHeights[i + 1] == null) continue;
         ctx.beginPath();
-        ctx.moveTo(worldX(i) - cameraX, worldY(rideHeights[i]));
-        ctx.lineTo(worldX(i + 1) - cameraX, worldY(rideHeights[i + 1]));
+        ctx.moveTo(worldX(i) - cameraX, worldY(rideHeights[i]) - cameraY);
+        ctx.lineTo(worldX(i + 1) - cameraX, worldY(rideHeights[i + 1]) - cameraY);
         ctx.stroke();
         ctx.strokeStyle = "#ffd76b"; ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(worldX(i) - cameraX, worldY(rideHeights[i]) - 4);
-        ctx.lineTo(worldX(i + 1) - cameraX, worldY(rideHeights[i + 1]) - 4);
+        ctx.moveTo(worldX(i) - cameraX, worldY(rideHeights[i]) - 4 - cameraY);
+        ctx.lineTo(worldX(i + 1) - cameraX, worldY(rideHeights[i + 1]) - 4 - cameraY);
         ctx.stroke();
         ctx.strokeStyle = "#3a2a5e"; ctx.lineWidth = 6;
       }
@@ -574,7 +585,7 @@
       for (var li = 0; li < rideLoops.length; li++) {
         if (!rideLoops[li] || rideHeights[li] == null) continue;
         var loopCx = worldX(li) - cameraX;
-        var loopCy = worldY(rideHeights[li]) - LOOP_RADIUS;
+        var loopCy = worldY(rideHeights[li]) - LOOP_RADIUS - cameraY;
         if (loopCx < -LOOP_RADIUS * 2 || loopCx > CANVAS_W + LOOP_RADIUS * 2) continue;
         ctx.strokeStyle = "#b26bff"; ctx.lineWidth = 5;
         ctx.beginPath(); ctx.arc(loopCx, loopCy, LOOP_RADIUS, 0, Math.PI * 2); ctx.stroke();
@@ -583,11 +594,11 @@
       }
       // ground
       ctx.fillStyle = "#2b8a3e";
-      ctx.fillRect(0, GROUND_Y + 4, CANVAS_W, CANVAS_H - GROUND_Y - 4);
+      ctx.fillRect(0, GROUND_Y + 4 - cameraY, CANVAS_W, CANVAS_H - GROUND_Y - 4);
 
       // cart — rendered in the rider's own chosen color/emoji so it really looks like you (or
       // whichever contact set an identity) are the one on the ride, not a generic placeholder
-      var cx = cartWX - cameraX, cy = cartWY;
+      var cx = cartWX - cameraX, cy = cartWY - cameraY;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(slopeAngle);
@@ -601,7 +612,7 @@
       ctx.restore();
 
       // progress bar
-      var pct = rideCrashed ? (worldX(prog.col) / worldX(TRACK_COLS - 1)) * 100 : Math.min(100, (cartWX / worldX(TRACK_COLS - 1)) * 100);
+      var pct = rideCrashed ? (worldX(prog.col) / worldX(rideHeights.length - 1)) * 100 : Math.min(100, (cartWX / worldX(rideHeights.length - 1)) * 100);
       document.getElementById("progressBarFill").style.width = clampNum(pct, 0, 100) + "%";
 
       if (rideCrashed && fallDt > 1.5) {
@@ -632,19 +643,30 @@
     var builderLoops = noLoops();
     var builderCtx = null;
     var builderMode = "draw"; // "draw" | "erase" | "loop"
+    var BUILDER_COL_W = 20, BUILDER_UNIT_H = 24;
     function initBuilderCanvas() {
       var canvas = document.getElementById("builderCanvas");
-      canvas.width = TRACK_COLS * 20; canvas.height = (MAX_HEIGHT + 2) * 24;
       builderCtx = canvas.getContext("2d");
+      resizeBuilderCanvas();
+    }
+    // Re-sizes the canvas to fit however many columns the track currently has (it can grow via
+    // "Add More Track"), at a fixed per-column pixel width — so columns stay a consistent, easy
+    // size to tap, and the scrollable #builderWrap reveals more of a longer track by scrolling
+    // rather than squeezing every column thinner.
+    function resizeBuilderCanvas() {
+      var canvas = document.getElementById("builderCanvas");
+      canvas.width = builderHeights.length * BUILDER_COL_W;
+      canvas.height = (MAX_HEIGHT + 2) * BUILDER_UNIT_H;
     }
     function renderBuilder() {
       var canvas = document.getElementById("builderCanvas");
+      if (canvas.width !== builderHeights.length * BUILDER_COL_W) resizeBuilderCanvas();
       var ctx = builderCtx;
-      var colW = canvas.width / TRACK_COLS;
-      var unitH = 24;
+      var colW = BUILDER_COL_W;
+      var unitH = BUILDER_UNIT_H;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#12163a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      for (var i = 0; i < TRACK_COLS; i++) {
+      for (var i = 0; i < builderHeights.length; i++) {
         var h = builderHeights[i];
         var x = i * colW;
         if (h == null) {
@@ -667,8 +689,8 @@
       var rect = canvas.getBoundingClientRect();
       var scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
       var px = (e.clientX - rect.left) * scaleX, py = (e.clientY - rect.top) * scaleY;
-      var colW = canvas.width / TRACK_COLS;
-      var col = clampNum(Math.floor(px / colW), 0, TRACK_COLS - 1);
+      var colW = BUILDER_COL_W;
+      var col = clampNum(Math.floor(px / colW), 0, builderHeights.length - 1);
       if (builderMode === "erase") {
         builderHeights[col] = null;
         builderLoops[col] = false; // no track there means no loop there either
@@ -677,8 +699,7 @@
         builderLoops[col] = !builderLoops[col];
         if (builderLoops[col] && builderHeights[col] == null) builderHeights[col] = DEFAULT_HEIGHT; // a loop needs real track under it
       } else {
-        var unitH = 24;
-        var h = Math.round((canvas.height - py) / unitH);
+        var h = Math.round((canvas.height - py) / BUILDER_UNIT_H);
         builderHeights[col] = clampNum(h, MIN_HEIGHT, MAX_HEIGHT);
       }
       renderBuilder();
@@ -687,7 +708,7 @@
     var pendingBuildX = null, pendingBuildY = null;
     function openBuilder(startFresh) {
       builderHeights = startFresh ? newFlatTrack() : (loadMyTrack() || newFlatTrack());
-      builderLoops = startFresh ? noLoops() : (loadMyTrackLoops() || noLoops());
+      builderLoops = startFresh ? noLoops(builderHeights.length) : (loadMyTrackLoops() || noLoops(builderHeights.length));
       if (startFresh) document.getElementById("coasterNameInput").value = "";
       builderMode = "draw";
       if (!builderCtx) initBuilderCanvas();
@@ -699,6 +720,26 @@
       document.getElementById("modeEraseBtn").className = "btn" + (builderMode === "erase" ? " danger" : "");
       document.getElementById("modeLoopBtn").className = "btn" + (builderMode === "loop" ? " danger" : "");
       document.getElementById("modeDrawBtn").style.opacity = builderMode === "draw" ? "1" : "0.7";
+    }
+    var MIN_TRACK_COLS = 8;
+    function addTrackChunk() {
+      if (builderHeights.length >= MAX_TRACK_COLS) return;
+      var howMany = Math.min(ADD_TRACK_CHUNK, MAX_TRACK_COLS - builderHeights.length);
+      var lastHeight = builderHeights[builderHeights.length - 1];
+      for (var i = 0; i < howMany; i++) {
+        builderHeights.push(lastHeight == null ? DEFAULT_HEIGHT : lastHeight);
+        builderLoops.push(false);
+      }
+      renderBuilder();
+      var wrap = document.getElementById("builderWrap");
+      wrap.scrollLeft = wrap.scrollWidth; // scroll to reveal the newly-added end
+    }
+    function removeTrackChunk() {
+      if (builderHeights.length <= MIN_TRACK_COLS) return;
+      var howMany = Math.min(ADD_TRACK_CHUNK, builderHeights.length - MIN_TRACK_COLS);
+      builderHeights.length -= howMany;
+      builderLoops.length -= howMany;
+      renderBuilder();
     }
 
     // ---------------- live rooms (Supabase) ----------------
@@ -720,7 +761,7 @@
       var code = randomRoomCode();
       var attempts = 0;
       while (attempts < 3) {
-        var res = await sb.from("rooms").insert({ code: code, track: heights, name: name || "", loops: loops || noLoops() }).select();
+        var res = await sb.from("rooms").insert({ code: code, track: heights, name: name || "", loops: loops || noLoops(heights.length) }).select();
         if (!res.error) break;
         code = randomRoomCode();
         attempts++;
@@ -1321,7 +1362,7 @@
     async function rideCoasterTogether(coaster) {
       var code = "C" + coaster.id;
       var existing = await sb.from("rooms").select("*").eq("code", code).maybeSingle();
-      if (!existing.data) await sb.from("rooms").insert({ code: code, track: coaster.heights, name: coaster.name, loops: coaster.loops || noLoops() });
+      if (!existing.data) await sb.from("rooms").insert({ code: code, track: coaster.heights, name: coaster.name, loops: coaster.loops || noLoops(coaster.heights.length) });
       currentRoomCode = code;
       isHostOfRoom = true;
       roomLaunchedFromPark = true;
@@ -1441,6 +1482,8 @@
     document.getElementById("modeDrawBtn").addEventListener("click", function () { builderMode = "draw"; renderModeButtons(); });
     document.getElementById("modeEraseBtn").addEventListener("click", function () { builderMode = "erase"; renderModeButtons(); });
     document.getElementById("modeLoopBtn").addEventListener("click", function () { builderMode = "loop"; renderModeButtons(); });
+    document.getElementById("addTrackBtn").addEventListener("click", addTrackChunk);
+    document.getElementById("removeTrackBtn").addEventListener("click", removeTrackChunk);
     (function () {
       var canvas = document.getElementById("builderCanvas");
       var dragging = false;
