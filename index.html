@@ -779,15 +779,13 @@
     }
 
     // ---------------- pick a name before building (real Lagoon-style coaster names, or your own) ----------------
-    var PRESET_COASTER_NAMES = [
-      { name: "Cannibal", emoji: "👹" },
-      { name: "Wicked", emoji: "😈" },
-      { name: "Colossus: The Fire Dragon", emoji: "🐉" },
-      { name: "Spider", emoji: "🕷️" },
-    ];
-    var selectedPresetName = null; // null = nothing picked yet, "" = "type my own", else a preset name
+    // These 3 are real, ready-made coasters (same data as the COMPUTER_COASTERS entries) — picking
+    // one here instantly adds it to your park, no hand-drawing required. "Build My Own" is the only
+    // option that still opens the hill-drawing tool, since there's no pre-made data for that.
+    var NAME_PICKER_PRESET_IDS = ["cannibal", "wicked", "colossus"];
+    var selectedPresetId = null; // null = nothing picked yet, "__custom__" = build my own, else a COMPUTER_COASTERS id
     function openNameCoaster() {
-      selectedPresetName = null;
+      selectedPresetId = null;
       renderCoasterNamePicker();
       document.getElementById("nameCoasterCreateBtn").disabled = true;
       showScreen("screen-nameCoaster");
@@ -795,22 +793,24 @@
     function renderCoasterNamePicker() {
       var grid = document.getElementById("coasterNamePicker");
       grid.innerHTML = "";
-      PRESET_COASTER_NAMES.forEach(function (p) {
+      NAME_PICKER_PRESET_IDS.forEach(function (id) {
+        var c = COMPUTER_COASTERS.find(function (cc) { return cc.id === id; });
+        if (!c) return;
         var card = document.createElement("div");
-        card.className = "templateCard" + (selectedPresetName === p.name ? " selected" : "");
-        card.innerHTML = '<span class="emo">' + p.emoji + '</span><span class="name">' + p.name + '</span>';
+        card.className = "templateCard" + (selectedPresetId === id ? " selected" : "");
+        card.innerHTML = '<span class="emo">' + c.emoji + '</span><span class="name">' + c.name + '</span>';
         card.addEventListener("click", function () {
-          selectedPresetName = p.name;
+          selectedPresetId = id;
           document.getElementById("nameCoasterCreateBtn").disabled = false;
           renderCoasterNamePicker();
         });
         grid.appendChild(card);
       });
       var customCard = document.createElement("div");
-      customCard.className = "templateCard" + (selectedPresetName === "" ? " selected" : "");
-      customCard.innerHTML = '<span class="emo">📝</span><span class="name">Type My Own Name</span>';
+      customCard.className = "templateCard" + (selectedPresetId === "__custom__" ? " selected" : "");
+      customCard.innerHTML = '<span class="emo">🛠️</span><span class="name">Build My Own</span>';
       customCard.addEventListener("click", function () {
-        selectedPresetName = "";
+        selectedPresetId = "__custom__";
         document.getElementById("nameCoasterCreateBtn").disabled = false;
         renderCoasterNamePicker();
       });
@@ -1558,8 +1558,11 @@
       showScreen(builderReturnTo);
     });
     document.getElementById("nameCoasterCreateBtn").addEventListener("click", function () {
-      if (selectedPresetName === null) return;
-      openBuilder(selectedPresetName);
+      if (selectedPresetId === null) return;
+      if (selectedPresetId === "__custom__") { openBuilder(); return; }
+      var c = COMPUTER_COASTERS.find(function (cc) { return cc.id === selectedPresetId; });
+      if (!c) return;
+      finishSavingCoaster(c.heights.slice(), c.loops.slice(), c.name); // instant add — no drawing needed
     });
     document.getElementById("searchGoBtn").addEventListener("click", searchPark);
     document.getElementById("searchInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); searchPark(); } });
@@ -1602,10 +1605,11 @@
       pendingBuildX = null; pendingBuildY = null;
       showScreen(builderReturnTo);
     });
-    document.getElementById("builderSaveBtn").addEventListener("click", async function () {
-      var name = document.getElementById("coasterNameInput").value.trim() || "My Awesome Coaster";
+    // Shared by both "Save" in the hand-drawn builder AND instantly-adding a ready-made coaster
+    // (Cannibal/Wicked/Colossus) from the name picker with no drawing step at all.
+    async function finishSavingCoaster(heights, loops, name) {
       var builderName = myName || "A Kid";
-      var row = { name: name, heights: builderHeights, loops: builderLoops, builder_name: builderName };
+      var row = { name: name, heights: heights, loops: loops, builder_name: builderName };
       if (pendingBuildX != null && pendingBuildY != null) { row.x = pendingBuildX; row.y = pendingBuildY; }
       var res = await sb.from("coasters").insert(row).select();
       var savedRow = (res.data && res.data[0]) || Object.assign({ id: "local_" + Date.now() }, row);
@@ -1619,6 +1623,10 @@
       } else {
         showScreen("screen-saved");
       }
+    }
+    document.getElementById("builderSaveBtn").addEventListener("click", function () {
+      var name = document.getElementById("coasterNameInput").value.trim() || "My Awesome Coaster";
+      finishSavingCoaster(builderHeights, builderLoops, name);
     });
     document.getElementById("modeDrawBtn").addEventListener("click", function () { builderMode = "draw"; renderModeButtons(); });
     document.getElementById("modeEraseBtn").addEventListener("click", function () { builderMode = "erase"; renderModeButtons(); });
