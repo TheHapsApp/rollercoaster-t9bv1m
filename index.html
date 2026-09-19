@@ -474,14 +474,15 @@
       // beyond-vertical launch drop, Wicked's twisting dive off the lift, Colossus's long classic
       // wooden-coaster profile — not a literal survey-accurate trace, just a genuine best effort at
       // the real shape and feel within what a simple height-per-column track can represent.
-      // Real Cannibal, verified stats: 197ft tall, an ENCLOSED elevator lift (not a diagonal chain
-      // lift) carrying the train ~208ft up, a 116° beyond-vertical first drop (was briefly the
-      // steepest in the US), 70mph, and 3 named inversions totaling 4 inversion points — an
-      // Immelmann loop, a dive loop, and a "Lagoon Roll." Still just a height-per-column
-      // approximation (no real banking/G-force/exact 2735ft length/2:30 duration), but every
-      // element below is now placed to match a real, sourced fact rather than a guess.
-      { id: "cannibal", name: "Cannibal", emoji: "👹", loops: loopsAt([7, 10, 21], 32),
-        heights: [2,2,20,20,2,5,13,13,4,12,12,3,9,4,8,5,10,3,7,4,9,9,4,6,3,5,3,4,3,3,2,2] },
+      // Real Cannibal — RCDB's official element list, in order: Elevator Lift, Immelmann, Dive
+      // Loop, Over-Banked Curve, Block Brake, Lagoon Roll, 450° Helix. 197ft tall, 116° beyond-
+      // vertical first drop, 72mph. The 3 true named inversions (Immelmann/Dive Loop/Lagoon Roll)
+      // get the loop element; the Helix isn't technically an inversion (it's a horizontal spiral,
+      // not a vertical loop) but gets the same loop visual too since that's the closest "goes
+      // around in a circle" primitive this engine has — everything else (curve, brake, drop, lift)
+      // is still just a height-per-column approximation, no real banking/G-force/exact length.
+      { id: "cannibal", name: "Cannibal", emoji: "👹", loops: loopsAt([7, 10, 17, 20], 30),
+        heights: [2,2,20,20,2,5,13,13,4,12,12,5,8,8,6,6,9,9,4,8,8,4,5,3,4,3,3,2,2,2] },
       // Real Wicked: launches out of a dark tunnel, straight up a near-vertical spike, then a
       // twisting run of turns — not an inversion, so no loop flag here (an earlier version wrongly
       // approximated it with one; fixed per a closer description of the real ride).
