@@ -188,6 +188,11 @@
       <button class="btn" id="modeLoopBtn">🔁 Loop the Loop!</button>
     </div>
     <div style="font-size:0.8rem; opacity:0.85; margin-bottom:8px;">Drag up and down to build hills — scroll to build super tall! Erase a spot to leave a gap. Tap in Loop mode to add a loop-the-loop. Make it as long as you want with "Add More Track"!</div>
+    <div style="margin-top:8px;">Shape (looking down from above):</div>
+    <div class="modeRow">
+      <button class="btn" id="shapeStraightBtn">➡️ Straight</button>
+      <button class="btn" id="shapeRectangleBtn">🔲 Rectangle (like Lagoon's "Roller Coaster"!)</button>
+    </div>
     <div style="margin-top:8px;">Name your coaster:</div>
     <input type="text" id="coasterNameInput" maxlength="24" placeholder="My Awesome Coaster">
   </div>
@@ -432,7 +437,7 @@
     }
     function addMyCoaster(coaster) {
       var list = loadMyCoasters();
-      list.push({ id: coaster.id, name: coaster.name, heights: coaster.heights, loops: coaster.loops });
+      list.push({ id: coaster.id, name: coaster.name, heights: coaster.heights, loops: coaster.loops, shape: coaster.shape || "straight" });
       saveMyCoastersList(list);
     }
     // One-time upgrade: before this update, a kid could only have ONE coaster locally (each new
@@ -475,6 +480,11 @@
         heights: [2,5,20,18,4,12,4,10,3,8,3,6,3,5,3,4,3,3,2,2,2,2,2,2] },
       { id: "colossus", name: "Colossus: The Fire Dragon", emoji: "🐉", loops: noLoops(32),
         heights: [2,4,8,14,18,20,19,8,16,6,14,5,12,5,10,5,9,4,8,4,7,4,6,3,5,3,4,3,3,2,2,2] },
+      // Lagoon's classic wooden coaster is literally named "Roller Coaster" — from above its track
+      // traces a rectangle (out one long side, around the far end, back the other side). This is the
+      // one COMPUTER_COASTERS entry with shape:"rectangle", so it renders in the top-down view.
+      { id: "rollercoaster", name: "Roller Coaster", emoji: "🎢", loops: noLoops(), shape: "rectangle",
+        heights: [2,4,9,15,20,18,8,15,6,12,5,10,5,8,4,7,4,5,3,4,3,3,2,2] },
       { id: "wavy", name: "Wavy Wonder", emoji: "🌊", loops: noLoops(),
         heights: [4,5,6,7,6,5,4,3,2,3,4,5,6,7,6,5,4,3,2,3,4,5,6,4] },
       { id: "mountain", name: "Mountain Madness", emoji: "🏔️", loops: noLoops(),
@@ -564,20 +574,23 @@
     // landed slightly after the host's start signal) — the timeline math above means jumping straight
     // to that offset still lands in exactly the right place.
     var rideCoasterName = "";
-    function beginRide(heights, startAtElapsedSec, name, loops) {
+    var rideShape = "straight";
+    function beginRide(heights, startAtElapsedSec, name, loops, shape) {
       if (!rideCtx) initRideCanvas();
       rideHeights = heights;
       rideFallback = fallbackHeights(heights);
       rideTimeline = buildRideTimeline(rideFallback);
       rideLoops = loops || noLoops(heights.length);
+      rideShape = shape || "straight";
       rideCrashed = false; rideFinished = false;
+      topDownCrashed = false; topDownCrashPos = null; topDownCrashDir = null;
       rideStartPerf = performance.now() - Math.max(0, startAtElapsedSec || 0) * 1000;
       rideCoasterName = name || "";
       document.getElementById("rideCoasterNameLabel").textContent = rideCoasterName ? ("🎢 " + rideCoasterName) : "";
       document.getElementById("rideOverlay").classList.remove("show");
       showScreen("screen-ride");
       if (rideAnimId) cancelAnimationFrame(rideAnimId);
-      rideAnimId = requestAnimationFrame(rideFrame);
+      rideAnimId = requestAnimationFrame(rideShape === "rectangle" ? rideFrameTopDown : rideFrame);
     }
     function rideFrame() {
       var elapsed = (performance.now() - rideStartPerf) / 1000;
@@ -683,6 +696,103 @@
       }
       rideAnimId = requestAnimationFrame(rideFrame);
     }
+
+    // ---------------- top-down "shape" view — a coaster built with Rectangle shape (like Lagoon's
+    // classic "Roller Coaster") renders here instead: a bird's-eye rectangle outline with the cart
+    // tracing its perimeter, rather than the side-view hill scroller above. It's driven by the exact
+    // same deterministic getRideProgress()/timeline as the side view, so pacing (still shaped by the
+    // height data — faster on "downhill" columns, slower on "uphill" ones), gap-crash detection, and
+    // multiplayer sync all work identically; only the DRAWING differs. Loops are skipped here (a
+    // vertical loop has no meaning from directly above) — the data can still exist harmlessly.
+    var RECT_HALF_W = 150, RECT_HALF_H = 85;
+    var topDownCrashed = false, topDownCrashStartPerf = 0, topDownCrashPos = null, topDownCrashDir = 0;
+    function rectanglePerimeterPoint(t) {
+      var w = RECT_HALF_W * 2, h = RECT_HALF_H * 2;
+      var perim = 2 * (w + h);
+      var d = clampNum(t, 0, 1) * perim;
+      if (d <= w) return { x: -RECT_HALF_W + d, y: -RECT_HALF_H, dir: 0 };
+      d -= w;
+      if (d <= h) return { x: RECT_HALF_W, y: -RECT_HALF_H + d, dir: Math.PI / 2 };
+      d -= h;
+      if (d <= w) return { x: RECT_HALF_W - d, y: RECT_HALF_H, dir: Math.PI };
+      d -= w;
+      return { x: -RECT_HALF_W, y: RECT_HALF_H - d, dir: -Math.PI / 2 };
+    }
+    function rideFrameTopDown() {
+      var elapsed = (performance.now() - rideStartPerf) / 1000;
+      var ctx = rideCtx;
+      var centerX = CANVAS_W / 2, centerY = CANVAS_H / 2;
+      ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.fillStyle = "#6fc94f"; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+      var prog = getRideProgress(rideTimeline, Math.min(elapsed, rideTimeline[rideTimeline.length - 1]));
+      var lastCol = rideHeights.length - 1;
+
+      // track outline, one straight segment per column boundary (a real gap in the data leaves a
+      // real visible break in the rectangle, same honesty as the side view's drawn gaps)
+      ctx.lineCap = "round";
+      for (var i = 0; i < lastCol; i++) {
+        if (rideHeights[i] == null || rideHeights[i + 1] == null) continue;
+        var pA = rectanglePerimeterPoint(i / lastCol), pB = rectanglePerimeterPoint((i + 1) / lastCol);
+        ctx.lineWidth = 8; ctx.strokeStyle = "#3a2a5e";
+        ctx.beginPath(); ctx.moveTo(centerX + pA.x, centerY + pA.y); ctx.lineTo(centerX + pB.x, centerY + pB.y); ctx.stroke();
+        ctx.lineWidth = 3; ctx.strokeStyle = "#ffd76b";
+        ctx.beginPath(); ctx.moveTo(centerX + pA.x, centerY + pA.y); ctx.lineTo(centerX + pB.x, centerY + pB.y); ctx.stroke();
+      }
+
+      var overallT = (prog.col + prog.frac) / lastCol;
+      var isOverGap = (rideHeights[prog.col] == null) || (rideHeights[prog.nextCol] == null && prog.frac > 0.3);
+      var cartX, cartY, cartAngle;
+
+      if (!topDownCrashed) {
+        var pt = rectanglePerimeterPoint(overallT);
+        cartX = centerX + pt.x; cartY = centerY + pt.y; cartAngle = pt.dir;
+        if (isOverGap && !prog.done) {
+          topDownCrashed = true; rideCrashed = true;
+          topDownCrashStartPerf = performance.now(); crashStartPerf = topDownCrashStartPerf;
+          topDownCrashPos = { x: cartX, y: cartY }; topDownCrashDir = pt.dir;
+          playCrashSound();
+        } else if (prog.done) {
+          rideFinished = true;
+        }
+      }
+      var fallDt = 0;
+      if (topDownCrashed) {
+        fallDt = (performance.now() - topDownCrashStartPerf) / 1000;
+        var dist = fallDt * 220;
+        cartX = topDownCrashPos.x + Math.cos(topDownCrashDir) * dist;
+        cartY = topDownCrashPos.y + Math.sin(topDownCrashDir) * dist;
+        cartAngle = topDownCrashDir;
+      }
+
+      var alpha = topDownCrashed ? Math.max(0, 1 - fallDt / 1.2) : 1;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(cartX, cartY);
+      ctx.rotate(cartAngle);
+      ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.fillStyle = myName ? myColor : "#ff5f5f"; ctx.fill();
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = "16px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(myName ? myEmoji : "😃", cartX, cartY + 5);
+      ctx.restore();
+
+      var pct = Math.min(100, overallT * 100);
+      document.getElementById("progressBarFill").style.width = clampNum(pct, 0, 100) + "%";
+
+      if (topDownCrashed && fallDt > 1.2) {
+        showRideEnd(false);
+        return;
+      }
+      if (rideFinished) {
+        showRideEnd(true);
+        return;
+      }
+      rideAnimId = requestAnimationFrame(rideFrameTopDown);
+    }
     function showRideEnd(success) {
       cancelAnimationFrame(rideAnimId);
       var overlay = document.getElementById("rideOverlay");
@@ -701,6 +811,7 @@
     var builderLoops = noLoops();
     var builderCtx = null;
     var builderMode = "draw"; // "draw" | "erase" | "loop"
+    var builderShape = "straight"; // "straight" | "rectangle" — how the track looks from above
     var BUILDER_COL_W = 20, BUILDER_UNIT_H = 24;
     function initBuilderCanvas() {
       var canvas = document.getElementById("builderCanvas");
@@ -772,17 +883,23 @@
       builderLoops = noLoops(builderHeights.length);
       document.getElementById("coasterNameInput").value = prefillName || "";
       builderMode = "draw";
+      builderShape = "straight";
       if (!builderCtx) initBuilderCanvas();
       renderBuilder();
       renderModeButtons();
+      renderShapeButtons();
       showScreen("screen-builder");
+    }
+    function renderShapeButtons() {
+      document.getElementById("shapeStraightBtn").className = "btn" + (builderShape === "straight" ? " danger" : "");
+      document.getElementById("shapeRectangleBtn").className = "btn" + (builderShape === "rectangle" ? " danger" : "");
     }
 
     // ---------------- pick a name before building (real Lagoon-style coaster names, or your own) ----------------
     // These 3 are real, ready-made coasters (same data as the COMPUTER_COASTERS entries) — picking
     // one here instantly adds it to your park, no hand-drawing required. "Build My Own" is the only
     // option that still opens the hill-drawing tool, since there's no pre-made data for that.
-    var NAME_PICKER_PRESET_IDS = ["cannibal", "wicked", "colossus"];
+    var NAME_PICKER_PRESET_IDS = ["cannibal", "wicked", "colossus", "rollercoaster"];
     var selectedPresetId = null; // null = nothing picked yet, "__custom__" = build my own, else a COMPUTER_COASTERS id
     function openNameCoaster() {
       selectedPresetId = null;
@@ -857,11 +974,11 @@
     function teardownRoomChannel() {
       if (currentRoomChannel) { sb.removeChannel(currentRoomChannel); currentRoomChannel = null; }
     }
-    async function hostLiveRoom(heights, name, loops) {
+    async function hostLiveRoom(heights, name, loops, shape) {
       var code = randomRoomCode();
       var attempts = 0;
       while (attempts < 3) {
-        var res = await sb.from("rooms").insert({ code: code, track: heights, name: name || "", loops: loops || noLoops(heights.length) }).select();
+        var res = await sb.from("rooms").insert({ code: code, track: heights, name: name || "", loops: loops || noLoops(heights.length), shape: shape || "straight" }).select();
         if (!res.error) break;
         code = randomRoomCode();
         attempts++;
@@ -902,7 +1019,7 @@
           if (row.ride_started_at) {
             var startedAtMs = new Date(row.ride_started_at).getTime();
             var elapsedSec = (Date.now() - startedAtMs) / 1000;
-            beginRide(row.track, elapsedSec, row.name, row.loops);
+            beginRide(row.track, elapsedSec, row.name, row.loops, row.shape);
           }
         })
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "room_members", filter: "code=eq." + code }, function (payload) {
@@ -933,7 +1050,7 @@
       var freshRoom = await sb.from("rooms").select("*").eq("code", code).maybeSingle();
       if (freshRoom.data && freshRoom.data.ride_started_at) {
         var startedAtMs = new Date(freshRoom.data.ride_started_at).getTime();
-        beginRide(freshRoom.data.track, (Date.now() - startedAtMs) / 1000, freshRoom.data.name, freshRoom.data.loops);
+        beginRide(freshRoom.data.track, (Date.now() - startedAtMs) / 1000, freshRoom.data.name, freshRoom.data.loops, freshRoom.data.shape);
       }
     }
     async function startHostedRide() {
@@ -1332,7 +1449,7 @@
         var btn3 = document.createElement("button");
         btn3.className = "btn small";
         btn3.textContent = "🎫 Ride It!";
-        btn3.addEventListener("click", function () { beginRide(pin.coaster.heights, 0, pin.coaster.name, pin.coaster.loops); });
+        btn3.addEventListener("click", function () { beginRide(pin.coaster.heights, 0, pin.coaster.name, pin.coaster.loops, pin.coaster.shape); });
         box.appendChild(btn3);
       } else if (pin.type === "fun") {
         var btn2 = document.createElement("button");
@@ -1471,13 +1588,13 @@
         var info = document.createElement("div");
         info.style.flex = "1"; info.style.display = "flex"; info.style.alignItems = "center"; info.style.gap = "10px"; info.style.cursor = "pointer";
         info.innerHTML = '<span class="emo">🎢</span><span class="name">' + c.name + '</span>';
-        info.addEventListener("click", function () { beginRide(c.heights, 0, c.name, c.loops); });
+        info.addEventListener("click", function () { beginRide(c.heights, 0, c.name, c.loops, c.shape); });
         card.appendChild(info);
         var hostBtn = document.createElement("button");
         hostBtn.className = "btn small";
         hostBtn.textContent = "👥";
         hostBtn.title = "Host a live ride";
-        hostBtn.addEventListener("click", function (e) { e.stopPropagation(); hostLiveRoom(c.heights, c.name, c.loops); });
+        hostBtn.addEventListener("click", function (e) { e.stopPropagation(); hostLiveRoom(c.heights, c.name, c.loops, c.shape); });
         card.appendChild(hostBtn);
         list.appendChild(card);
       });
@@ -1493,7 +1610,7 @@
     async function rideCoasterTogether(coaster) {
       var code = "C" + coaster.id;
       var existing = await sb.from("rooms").select("*").eq("code", code).maybeSingle();
-      if (!existing.data) await sb.from("rooms").insert({ code: code, track: coaster.heights, name: coaster.name, loops: coaster.loops || noLoops(coaster.heights.length) });
+      if (!existing.data) await sb.from("rooms").insert({ code: code, track: coaster.heights, name: coaster.name, loops: coaster.loops || noLoops(coaster.heights.length), shape: coaster.shape || "straight" });
       currentRoomCode = code;
       isHostOfRoom = true;
       roomLaunchedFromPark = true;
@@ -1522,7 +1639,7 @@
         var card = document.createElement("div");
         card.className = "templateCard";
         card.innerHTML = '<span class="emo">' + t.emoji + '</span><span class="name">' + t.name + '</span>';
-        card.addEventListener("click", function () { beginRide(t.heights, 0, t.name, t.loops); });
+        card.addEventListener("click", function () { beginRide(t.heights, 0, t.name, t.loops, t.shape); });
         list.appendChild(card);
       });
       showScreen("screen-templates");
@@ -1562,7 +1679,7 @@
       if (selectedPresetId === "__custom__") { openBuilder(); return; }
       var c = COMPUTER_COASTERS.find(function (cc) { return cc.id === selectedPresetId; });
       if (!c) return;
-      finishSavingCoaster(c.heights.slice(), c.loops.slice(), c.name); // instant add — no drawing needed
+      finishSavingCoaster(c.heights.slice(), c.loops.slice(), c.name, c.shape); // instant add — no drawing needed
     });
     document.getElementById("searchGoBtn").addEventListener("click", searchPark);
     document.getElementById("searchInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); searchPark(); } });
@@ -1607,9 +1724,9 @@
     });
     // Shared by both "Save" in the hand-drawn builder AND instantly-adding a ready-made coaster
     // (Cannibal/Wicked/Colossus) from the name picker with no drawing step at all.
-    async function finishSavingCoaster(heights, loops, name) {
+    async function finishSavingCoaster(heights, loops, name, shape) {
       var builderName = myName || "A Kid";
-      var row = { name: name, heights: heights, loops: loops, builder_name: builderName };
+      var row = { name: name, heights: heights, loops: loops, shape: shape || "straight", builder_name: builderName };
       if (pendingBuildX != null && pendingBuildY != null) { row.x = pendingBuildX; row.y = pendingBuildY; }
       var res = await sb.from("coasters").insert(row).select();
       var savedRow = (res.data && res.data[0]) || Object.assign({ id: "local_" + Date.now() }, row);
@@ -1626,11 +1743,13 @@
     }
     document.getElementById("builderSaveBtn").addEventListener("click", function () {
       var name = document.getElementById("coasterNameInput").value.trim() || "My Awesome Coaster";
-      finishSavingCoaster(builderHeights, builderLoops, name);
+      finishSavingCoaster(builderHeights, builderLoops, name, builderShape);
     });
     document.getElementById("modeDrawBtn").addEventListener("click", function () { builderMode = "draw"; renderModeButtons(); });
     document.getElementById("modeEraseBtn").addEventListener("click", function () { builderMode = "erase"; renderModeButtons(); });
     document.getElementById("modeLoopBtn").addEventListener("click", function () { builderMode = "loop"; renderModeButtons(); });
+    document.getElementById("shapeStraightBtn").addEventListener("click", function () { builderShape = "straight"; renderShapeButtons(); });
+    document.getElementById("shapeRectangleBtn").addEventListener("click", function () { builderShape = "rectangle"; renderShapeButtons(); });
     document.getElementById("addTrackBtn").addEventListener("click", addTrackChunk);
     document.getElementById("removeTrackBtn").addEventListener("click", removeTrackChunk);
     (function () {
@@ -1642,8 +1761,8 @@
       canvas.addEventListener("pointerleave", function () { dragging = false; });
     })();
 
-    document.getElementById("savedRideBtn").addEventListener("click", function () { if (lastSavedCoaster) beginRide(lastSavedCoaster.heights, 0, lastSavedCoaster.name, lastSavedCoaster.loops); });
-    document.getElementById("savedHostBtn").addEventListener("click", function () { if (lastSavedCoaster) hostLiveRoom(lastSavedCoaster.heights, lastSavedCoaster.name, lastSavedCoaster.loops); });
+    document.getElementById("savedRideBtn").addEventListener("click", function () { if (lastSavedCoaster) beginRide(lastSavedCoaster.heights, 0, lastSavedCoaster.name, lastSavedCoaster.loops, lastSavedCoaster.shape); });
+    document.getElementById("savedHostBtn").addEventListener("click", function () { if (lastSavedCoaster) hostLiveRoom(lastSavedCoaster.heights, lastSavedCoaster.name, lastSavedCoaster.loops, lastSavedCoaster.shape); });
     document.getElementById("savedHomeBtn").addEventListener("click", function () { showScreen("screen-home"); });
 
     document.getElementById("joinCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
@@ -1659,7 +1778,7 @@
 
     document.getElementById("rideRetryBtn").addEventListener("click", function () {
       document.getElementById("rideOverlay").classList.remove("show");
-      beginRide(rideHeights, 0, rideCoasterName, rideLoops);
+      beginRide(rideHeights, 0, rideCoasterName, rideLoops, rideShape);
     });
     document.getElementById("rideHomeBtn").addEventListener("click", function () {
       document.getElementById("rideOverlay").classList.remove("show");
