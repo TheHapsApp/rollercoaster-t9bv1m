@@ -61,12 +61,13 @@
   }
   .overlay.show { display: flex; }
   .overlay .bigTitle { font-size: 1.2rem; font-weight: bold; }
-  #codeInput, #nameInput {
+  #codeInput, #nameInput, #coasterNameInput, #playerNameInput, #chatInput, #searchInput {
     font-family: inherit; font-size: 1.3rem; font-weight: bold; text-align: center; letter-spacing: 3px;
     padding: 10px; border-radius: 12px; border: 3px solid #fff; width: 90%; max-width: 260px;
     background: rgba(255,255,255,0.95); color: #2a1650; text-transform: uppercase;
   }
-  #nameInput { text-transform: none; letter-spacing: normal; font-size: 1.05rem; }
+  #nameInput, #coasterNameInput, #playerNameInput, #chatInput, #searchInput { text-transform: none; letter-spacing: normal; font-size: 1.05rem; }
+  #coasterNameInput, #playerNameInput { display: block; margin: 0 auto; }
   .roomCodeBig { font-size: 2.6rem; font-weight: bold; letter-spacing: 6px; text-shadow: 3px 3px 0 rgba(0,0,0,0.3); }
   #memberList { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 320px; }
   .memberChip { background: rgba(255,255,255,0.16); border: 2px solid #fff; border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; font-weight: bold; }
@@ -87,6 +88,50 @@
   .foodBtn:active { transform: translateY(3px); }
   #foodReaction { font-size: 1.1rem; font-weight: bold; min-height: 1.6em; margin-top: 10px; }
   #foodCount { font-size: 0.85rem; opacity: 0.85; }
+  .btn.small { font-size: 0.8rem; padding: 6px 10px; margin: 3px; }
+
+  /* ---- explore the park ---- */
+  #searchRow { display: flex; gap: 6px; margin-bottom: 4px; }
+  #searchStatus { font-size: 0.8rem; min-height: 1.2em; opacity: 0.9; margin-bottom: 4px; }
+  #parkWrap { width: 100%; aspect-ratio: 8/5; border: 4px solid #fff; border-radius: 14px; overflow: hidden; position: relative; background: #2b8a3e; }
+  #parkCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
+  #parkArrival {
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); border: 2px solid #fff; border-radius: 12px; padding: 6px 14px;
+    font-size: 0.85rem; font-weight: bold; display: none; text-align: center; max-width: 90%;
+  }
+  #parkArrival.show { display: block; }
+  #parkArrival .btn { margin-top: 6px; }
+
+  /* ---- identity setup ---- */
+  #colorGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; max-width: 260px; }
+  .colorSwatch2 { width: 40px; height: 40px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.5); cursor: pointer; padding: 0; position: relative; }
+  .colorSwatch2.selected { border-color: #fff; transform: scale(1.15); box-shadow: 0 0 0 2px #ffd76b; }
+  .colorSwatch2.takenTag::after {
+    content: "taken"; position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 0.55rem; opacity: 0.8; white-space: nowrap;
+  }
+  #emojiGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; width: 100%; max-width: 260px; margin-top: 4px; }
+  .emojiSwatch2 {
+    font-size: 1.3rem; background: rgba(255,255,255,0.14); border: 3px solid rgba(255,255,255,0.4);
+    border-radius: 10px; padding: 4px; cursor: pointer;
+  }
+  .emojiSwatch2.selected { border-color: #fff; background: rgba(255,215,107,0.35); }
+
+  /* ---- persistent chat bar ---- */
+  #chatBar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+    background: rgba(15, 8, 30, 0.92); border-top: 3px solid #fff;
+    padding: 6px 10px; box-sizing: border-box;
+  }
+  #chatToggleRow { display: flex; justify-content: center; }
+  #chatPanel { display: none; max-width: 480px; margin: 0 auto; }
+  #chatPanel.open { display: block; }
+  #chatMessages { max-height: 110px; overflow-y: auto; font-size: 0.8rem; margin-bottom: 6px; text-align: left; }
+  #chatMessages .chatLine { margin-bottom: 3px; }
+  #chatMessages .chatLine .who { font-weight: bold; }
+  #chatInputRow { display: flex; gap: 6px; }
+  body { padding-bottom: 70px; }
 
   footer { margin-top: 20px; font-size: 0.78rem; opacity: 0.7; }
 </style>
@@ -103,6 +148,7 @@
       <button class="bigBtn" id="homeComputerBtn"><span class="emo">🖥️</span>Ride a Computer-Built One</button>
       <button class="bigBtn" id="homeMineBtn"><span class="emo">🎫</span>Ride Your Own</button>
       <button class="bigBtn" id="homeJoinBtn"><span class="emo">👥</span>Join a Friend</button>
+      <button class="bigBtn" id="homeParkBtn" style="grid-column: 1 / -1; background: rgba(255,215,107,0.22);"><span class="emo">🗺️</span>Explore the Park (Everyone's Here!)</button>
       <button class="bigBtn" id="homeFoodBtn" style="grid-column: 1 / -1;"><span class="emo">🍔</span>Food Court</button>
     </div>
   </div>
@@ -119,7 +165,9 @@
       <button class="btn" id="modeDrawBtn">✏️ Draw Track</button>
       <button class="btn" id="modeEraseBtn">🗑️ Erase (Make a Gap!)</button>
     </div>
-    <div style="font-size:0.8rem; opacity:0.85;">Drag up and down to build hills. Erase a spot to leave a gap — go on too fast and you'll fly right off! 💥</div>
+    <div style="font-size:0.8rem; opacity:0.85; margin-bottom:8px;">Drag up and down to build hills. Erase a spot to leave a gap — go on too fast and you'll fly right off! 💥</div>
+    <div style="margin-top:8px;">Name your coaster:</div>
+    <input type="text" id="coasterNameInput" maxlength="24" placeholder="My Awesome Coaster">
   </div>
 
   <!-- ==================== SAVED-TRACK PROMPT ==================== -->
@@ -158,7 +206,7 @@
   <!-- ==================== HOST LOBBY ==================== -->
   <div class="screen" id="screen-hostLobby">
     <div class="title" style="margin-bottom:10px;">👥 Waiting for Friends</div>
-    <div style="font-size:0.85rem; opacity:0.9;">Tell your friends to tap "Join a Friend" and type this code:</div>
+    <div id="hostLobbyInstructions" style="font-size:0.85rem; opacity:0.9;">Tell your friends to tap "Join a Friend" and type this code:</div>
     <div class="roomCodeBig" id="hostCodeDisplay">----</div>
     <div id="hostMemberList" class="memberChip-wrap"><div id="memberListHost" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:320px;margin:10px auto;"></div></div>
     <button class="btn wide" id="hostStartBtn">🚀 Start the Ride!</button>
@@ -175,6 +223,7 @@
 
   <!-- ==================== RIDE ==================== -->
   <div class="screen" id="screen-ride">
+    <div id="rideCoasterNameLabel" style="font-weight:bold; font-size:1rem; margin-bottom:4px;"></div>
     <div id="progressBarWrap"><div id="progressBarFill"></div></div>
     <div id="rideWrap">
       <canvas id="rideCanvas"></canvas>
@@ -186,16 +235,61 @@
     </div>
   </div>
 
-  <!-- ==================== FOOD COURT ==================== -->
+  <!-- ==================== FOOD COURT / ARCADE / BOWLING / SKI BALL (shared shell) ==================== -->
   <div class="screen" id="screen-food">
     <div class="topBar">
       <button class="btn" id="foodBackBtn">✖ Back</button>
-      <div class="title">🍔 Food Court</div>
+      <div class="title" id="funScreenTitle">🍔 Food Court</div>
       <div style="width:70px;"></div>
     </div>
     <div id="foodGrid"></div>
     <div id="foodReaction"></div>
     <div id="foodCount"></div>
+  </div>
+
+  <!-- ==================== EXPLORE THE PARK ==================== -->
+  <div class="screen" id="screen-park">
+    <div class="topBar">
+      <button class="btn" id="parkBackBtn">✖ Leave Park</button>
+      <div class="title">🗺️ The Park</div>
+      <div style="width:70px;"></div>
+    </div>
+    <div id="searchRow">
+      <input type="text" id="searchInput" placeholder="Where is...?" style="text-transform:none; letter-spacing:normal; width:auto; max-width:none; flex:1; font-size:0.95rem;">
+      <button class="btn" id="searchGoBtn">🔍</button>
+    </div>
+    <div id="searchStatus"></div>
+    <div id="parkWrap">
+      <canvas id="parkCanvas"></canvas>
+      <div id="parkArrival"></div>
+    </div>
+    <div style="font-size:0.75rem; opacity:0.8; margin-top:6px;">Tap anywhere on the map to walk there!</div>
+  </div>
+
+  <!-- ==================== NAME + COLOR SETUP ==================== -->
+  <div class="overlay" id="identityOverlay">
+    <div class="bigTitle">🙂 Who Are You?</div>
+    <div>What's your name?</div>
+    <input type="text" id="playerNameInput" maxlength="14" placeholder="Your name">
+    <div style="margin-top:10px;">Pick your color:</div>
+    <div id="colorGrid"></div>
+    <div style="font-size:0.8rem; opacity:0.85;">(If someone already picked that color, you'll show up as your color + this emoji instead)</div>
+    <div id="emojiGrid"></div>
+    <button class="btn wide" id="identitySaveBtn">✅ Let's Go!</button>
+  </div>
+
+  <!-- ==================== PERSISTENT CHAT BAR (every screen) ==================== -->
+  <div id="chatBar">
+    <div id="chatToggleRow">
+      <button class="btn small" id="chatToggleBtn">💬 Chat</button>
+    </div>
+    <div id="chatPanel">
+      <div id="chatMessages"></div>
+      <div id="chatInputRow">
+        <input type="text" id="chatInput" maxlength="100" placeholder="Say something..." style="text-transform:none; letter-spacing:normal; width:auto; max-width:none; flex:1; font-size:0.9rem;">
+        <button class="btn small" id="chatSendBtn">➤</button>
+      </div>
+    </div>
   </div>
 
   <footer>Coaster Party! 🎢</footer>
@@ -335,13 +429,16 @@
     // startAtElapsedSec: if >0, the ride is joined mid-flight (e.g. a guest whose subscription/join
     // landed slightly after the host's start signal) — the timeline math above means jumping straight
     // to that offset still lands in exactly the right place.
-    function beginRide(heights, startAtElapsedSec) {
+    var rideCoasterName = "";
+    function beginRide(heights, startAtElapsedSec, name) {
       if (!rideCtx) initRideCanvas();
       rideHeights = heights;
       rideFallback = fallbackHeights(heights);
       rideTimeline = buildRideTimeline(rideFallback);
       rideCrashed = false; rideFinished = false;
       rideStartPerf = performance.now() - Math.max(0, startAtElapsedSec || 0) * 1000;
+      rideCoasterName = name || "";
+      document.getElementById("rideCoasterNameLabel").textContent = rideCoasterName ? ("🎢 " + rideCoasterName) : "";
       document.getElementById("rideOverlay").classList.remove("show");
       showScreen("screen-ride");
       if (rideAnimId) cancelAnimationFrame(rideAnimId);
@@ -516,19 +613,21 @@
     function teardownRoomChannel() {
       if (currentRoomChannel) { sb.removeChannel(currentRoomChannel); currentRoomChannel = null; }
     }
-    async function hostLiveRoom(heights) {
+    async function hostLiveRoom(heights, name) {
       var code = randomRoomCode();
       var attempts = 0;
       while (attempts < 3) {
-        var res = await sb.from("rooms").insert({ code: code, track: heights }).select();
+        var res = await sb.from("rooms").insert({ code: code, track: heights, name: name || "" }).select();
         if (!res.error) break;
         code = randomRoomCode();
         attempts++;
       }
       currentRoomCode = code;
       isHostOfRoom = true;
+      roomLaunchedFromPark = false;
       joinedMembers = [];
       document.getElementById("hostCodeDisplay").textContent = code;
+      document.getElementById("hostLobbyInstructions").textContent = 'Tell your friends to tap "Join a Friend" and type this code:';
       renderMemberChips();
       subscribeToRoom(code);
       showScreen("screen-hostLobby");
@@ -559,7 +658,7 @@
           if (row.ride_started_at) {
             var startedAtMs = new Date(row.ride_started_at).getTime();
             var elapsedSec = (Date.now() - startedAtMs) / 1000;
-            beginRide(row.track, elapsedSec);
+            beginRide(row.track, elapsedSec, row.name);
           }
         })
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "room_members", filter: "code=eq." + code }, function (payload) {
@@ -590,7 +689,7 @@
       var freshRoom = await sb.from("rooms").select("*").eq("code", code).maybeSingle();
       if (freshRoom.data && freshRoom.data.ride_started_at) {
         var startedAtMs = new Date(freshRoom.data.ride_started_at).getTime();
-        beginRide(freshRoom.data.track, (Date.now() - startedAtMs) / 1000);
+        beginRide(freshRoom.data.track, (Date.now() - startedAtMs) / 1000, freshRoom.data.name);
       }
     }
     async function startHostedRide() {
@@ -604,20 +703,67 @@
       joinedMembers = [];
     }
 
-    // ---------------- food court ----------------
-    var FOOD_ITEMS = [
-      { emo: "🍕", name: "Pizza", reactions: ["Yum, pizza! 🍕", "So cheesy and good!", "Best slice ever!"] },
-      { emo: "🍔", name: "Burger", reactions: ["Mmm, burger time! 🍔", "So juicy!", "Great choice!"] },
-      { emo: "🌭", name: "Hot Dog", reactions: ["Classic hot dog! 🌭", "Ketchup or mustard?", "Yum!"] },
-      { emo: "🍦", name: "Ice Cream", reactions: ["Cool and sweet! 🍦", "Brain freeze incoming!", "So creamy!"] },
-      { emo: "🍩", name: "Donut", reactions: ["Sprinkles galore! 🍩", "Sweet treat!", "So fluffy!"] },
-      { emo: "🥤", name: "Soda", reactions: ["Fizzy and refreshing! 🥤", "Bubbly!", "Thirst = quenched!"] },
-    ];
-    var foodOrderCount = 0;
-    function renderFoodGrid() {
+    // ---------------- food court / arcade / bowling / ski ball (shared shell, different item sets) ----------------
+    var FUN_SETS = {
+      food1: { title: "🍔 Snack Shack", items: [
+        { emo: "🍕", name: "Pizza", reactions: ["Yum, pizza! 🍕", "So cheesy and good!", "Best slice ever!"] },
+        { emo: "🍔", name: "Burger", reactions: ["Mmm, burger time! 🍔", "So juicy!", "Great choice!"] },
+        { emo: "🌭", name: "Hot Dog", reactions: ["Classic hot dog! 🌭", "Ketchup or mustard?", "Yum!"] },
+        { emo: "🍦", name: "Ice Cream", reactions: ["Cool and sweet! 🍦", "Brain freeze incoming!", "So creamy!"] },
+        { emo: "🍩", name: "Donut", reactions: ["Sprinkles galore! 🍩", "Sweet treat!", "So fluffy!"] },
+        { emo: "🥤", name: "Soda", reactions: ["Fizzy and refreshing! 🥤", "Bubbly!", "Thirst = quenched!"] },
+      ]},
+      food2: { title: "🍕 Pizza Plaza", items: [
+        { emo: "🍕", name: "Cheese Pizza", reactions: ["Classic and delicious! 🍕", "So cheesy!", "Yum!"] },
+        { emo: "🍕", name: "Pepperoni Pizza", reactions: ["Spicy and good! 🌶️", "So tasty!", "Best slice!"] },
+        { emo: "🥖", name: "Garlic Bread", reactions: ["So buttery! 🥖", "Garlicky goodness!", "Yum!"] },
+        { emo: "🥗", name: "Salad", reactions: ["Fresh and crunchy! 🥗", "Healthy choice!", "Yum!"] },
+        { emo: "🍝", name: "Pasta", reactions: ["Saucy and delicious! 🍝", "So good!", "Slurp!"] },
+        { emo: "🍋", name: "Lemonade", reactions: ["Refreshing! 🍋", "So fizzy!", "Yum!"] },
+      ]},
+      food3: { title: "🍦 Sweet Treats", items: [
+        { emo: "🍦", name: "Vanilla Cone", reactions: ["Classic and creamy! 🍦", "So smooth!", "Yum!"] },
+        { emo: "🍧", name: "Snow Cone", reactions: ["Cool and colorful! 🍧", "So refreshing!", "Yum!"] },
+        { emo: "🍫", name: "Chocolate Bar", reactions: ["Rich and chocolatey! 🍫", "So sweet!", "Yum!"] },
+        { emo: "🍪", name: "Cookie", reactions: ["Warm and gooey! 🍪", "So good!", "Yum!"] },
+        { emo: "🧁", name: "Cupcake", reactions: ["Frosting overload! 🧁", "So sweet!", "Yum!"] },
+        { emo: "🍭", name: "Lollipop", reactions: ["Swirly and sweet! 🍭", "So colorful!", "Yum!"] },
+      ]},
+      arcade: { title: "🕹️ Arcade", items: [
+        { emo: "🕹️", name: "Joystick Game", reactions: ["New high score! 🕹️", "So close to beating it!", "That was awesome!"] },
+        { emo: "🏀", name: "Hoops", reactions: ["Nothing but net! 🏀", "So close!", "Swish!"] },
+        { emo: "🎮", name: "Racing Game", reactions: ["Vroom vroom! 🏁", "First place!", "So fast!"] },
+        { emo: "🧸", name: "Claw Machine", reactions: ["Got it! 🧸", "So close, try again!", "Lucky grab!"] },
+        { emo: "🔨", name: "Whack-a-Mole", reactions: ["Whack! 🔨", "Got 'em all!", "So fast!"] },
+        { emo: "🔔", name: "Pinball", reactions: ["Ding ding ding! 🔔", "New record!", "Bouncy!"] },
+      ]},
+      bowling: { title: "🎳 Bowling", items: [
+        { emo: "🎳", name: "Strike Lane", reactions: ["STRIKE! 🎳", "Pins everywhere!", "Amazing throw!"] },
+        { emo: "🎳", name: "Spare Lane", reactions: ["Nice spare!", "So close to a strike!", "Great save!"] },
+        { emo: "😅", name: "Gutter Ball", reactions: ["Oops, gutter! 😅", "Try again!", "So close to the pins!"] },
+        { emo: "👟", name: "Bowling Shoes", reactions: ["Stylish shoes! 👟", "Comfy!", "Ready to bowl!"] },
+        { emo: "🏆", name: "Trophy Lane", reactions: ["Champion! 🏆", "Best score yet!", "Incredible game!"] },
+        { emo: "🎳", name: "Bumper Lane", reactions: ["Bumpers save the day!", "Never a gutter here!", "Fun for everyone!"] },
+      ]},
+      skiball: { title: "🎯 Ski Ball", items: [
+        { emo: "🎯", name: "100 Point Hole", reactions: ["Jackpot! 🎯 100 points!", "Amazing shot!", "Incredible aim!"] },
+        { emo: "🎯", name: "50 Point Hole", reactions: ["50 points! Nice!", "Great roll!", "So close to the top!"] },
+        { emo: "🎯", name: "30 Point Hole", reactions: ["30 points!", "Not bad!", "Getting warmed up!"] },
+        { emo: "🎫", name: "Ticket Prize", reactions: ["Tickets galore! 🎫", "Cash them in!", "So many tickets!"] },
+        { emo: "🎯", name: "10 Point Hole", reactions: ["10 points, keep going!", "Every point counts!", "Nice try!"] },
+        { emo: "🎯", name: "Bullseye", reactions: ["BULLSEYE! 🎯", "Perfect shot!", "Unbelievable!"] },
+      ]},
+    };
+    var funOrderCounts = {};
+    var funScreenReturnTo = "screen-home";
+    function openFunScreen(setKey, cameFromPark) {
+      var set = FUN_SETS[setKey];
+      if (!set) return;
+      funScreenReturnTo = cameFromPark ? "screen-park" : "screen-home";
+      document.getElementById("funScreenTitle").textContent = set.title;
       var grid = document.getElementById("foodGrid");
       grid.innerHTML = "";
-      FOOD_ITEMS.forEach(function (item) {
+      set.items.forEach(function (item) {
         var b = document.createElement("button");
         b.className = "foodBtn";
         b.textContent = item.emo;
@@ -625,11 +771,435 @@
           playYumSound();
           var line = item.reactions[Math.floor(Math.random() * item.reactions.length)];
           document.getElementById("foodReaction").textContent = line;
-          foodOrderCount++;
-          document.getElementById("foodCount").textContent = "You've tried " + foodOrderCount + " thing" + (foodOrderCount === 1 ? "" : "s") + " today!";
+          funOrderCounts[setKey] = (funOrderCounts[setKey] || 0) + 1;
+          document.getElementById("foodCount").textContent = "You've tried " + funOrderCounts[setKey] + " thing" + (funOrderCounts[setKey] === 1 ? "" : "s") + " today!";
         });
         grid.appendChild(b);
       });
+      document.getElementById("foodReaction").textContent = "";
+      document.getElementById("foodCount").textContent = funOrderCounts[setKey] > 0 ? ("You've tried " + funOrderCounts[setKey] + " things today!") : "";
+      showScreen("screen-food");
+    }
+
+    // ---------------- shared player identity (name, color, emoji) ----------------
+    var PLAYER_KEY = "coasterPartyPlayer";
+    var AVATAR_COLORS = ["#ff5f5f", "#3fd0ff", "#5fd97a", "#ffd76b", "#b26bff", "#ff8fd6", "#ffa64d", "#66e0c8"];
+    var AVATAR_EMOJIS = ["😀", "😎", "🤩", "🥳", "🦄", "🐶", "🐱", "🦊", "🐸", "🦁", "🐵", "🐧"];
+    var myName = "", myColor = AVATAR_COLORS[0], myEmoji = AVATAR_EMOJIS[0], myColorTaken = false;
+    var myClientId = "p_" + Math.random().toString(36).slice(2) + Date.now();
+    var pickedColorInSetup = null, pickedEmojiInSetup = null;
+    var identityThen = null; // callback to run after identity is saved (e.g. "now enter the park")
+
+    function loadPlayer() {
+      try {
+        var raw = window.localStorage.getItem(PLAYER_KEY);
+        var p = raw ? JSON.parse(raw) : null;
+        if (p && p.name) { myName = p.name; myColor = p.color || AVATAR_COLORS[0]; myEmoji = p.emoji || AVATAR_EMOJIS[0]; return true; }
+      } catch (e) {}
+      return false;
+    }
+    function savePlayer() {
+      try { window.localStorage.setItem(PLAYER_KEY, JSON.stringify({ name: myName, color: myColor, emoji: myEmoji })); } catch (e) {}
+    }
+    function currentlyTakenColors() {
+      var taken = {};
+      if (parkChannel) {
+        var state = parkChannel.presenceState();
+        Object.keys(state).forEach(function (key) {
+          if (key === myClientId) return;
+          (state[key] || []).forEach(function (meta) { if (meta.color && !meta.colorTaken) taken[meta.color] = true; });
+        });
+      }
+      return taken;
+    }
+    function openIdentityOverlay(thenFn) {
+      identityThen = thenFn || null;
+      document.getElementById("playerNameInput").value = myName || "";
+      pickedColorInSetup = myColor;
+      pickedEmojiInSetup = myEmoji;
+      renderColorGrid();
+      renderEmojiGrid();
+      document.getElementById("identityOverlay").classList.add("show");
+    }
+    function renderColorGrid() {
+      var grid = document.getElementById("colorGrid");
+      grid.innerHTML = "";
+      var taken = currentlyTakenColors();
+      AVATAR_COLORS.forEach(function (c) {
+        var sw = document.createElement("button");
+        sw.className = "colorSwatch2" + (c === pickedColorInSetup ? " selected" : "") + (taken[c] ? " takenTag" : "");
+        sw.style.background = c;
+        sw.addEventListener("click", function () { pickedColorInSetup = c; renderColorGrid(); });
+        grid.appendChild(sw);
+      });
+    }
+    function renderEmojiGrid() {
+      var grid = document.getElementById("emojiGrid");
+      grid.innerHTML = "";
+      AVATAR_EMOJIS.forEach(function (e) {
+        var b = document.createElement("button");
+        b.className = "emojiSwatch2" + (e === pickedEmojiInSetup ? " selected" : "");
+        b.textContent = e;
+        b.addEventListener("click", function () { pickedEmojiInSetup = e; renderEmojiGrid(); });
+        grid.appendChild(b);
+      });
+    }
+
+    // ---------------- the shared park: presence (who's here), broadcast (movement + chat) ----------------
+    var parkChannel = null;
+    var peers = {};
+    var chatMessages = [];
+    var parkCoasters = [];
+
+    function connectParkChannel() {
+      if (parkChannel) return;
+      parkChannel = sb.channel("park-world", { config: { presence: { key: myClientId } } });
+      parkChannel.on("presence", { event: "sync" }, function () { syncPeersFromPresence(); });
+      parkChannel.on("broadcast", { event: "move" }, function (msg) {
+        var p = msg.payload;
+        if (!p || p.id === myClientId) return;
+        if (peers[p.id]) { peers[p.id].x = p.x; peers[p.id].y = p.y; }
+      });
+      parkChannel.on("broadcast", { event: "chat" }, function (msg) {
+        if (msg.payload && msg.payload.id !== myClientId) addChatMessage(msg.payload.name, msg.payload.text);
+      });
+      parkChannel.on("postgres_changes", { event: "INSERT", schema: "public", table: "coasters" }, function (payload) {
+        parkCoasters.push(payload.new);
+      });
+      parkChannel.subscribe(function (status) {
+        if (status === "SUBSCRIBED") {
+          myColorTaken = !!currentlyTakenColors()[myColor];
+          parkChannel.track({ name: myName, color: myColor, emoji: myEmoji, colorTaken: myColorTaken, x: myWorldX, y: myWorldY });
+        }
+      });
+    }
+    function syncPeersFromPresence() {
+      var state = parkChannel.presenceState();
+      var next = {};
+      Object.keys(state).forEach(function (key) {
+        if (key === myClientId) return;
+        var metas = state[key];
+        if (!metas || !metas.length) return;
+        var meta = metas[metas.length - 1];
+        next[key] = peers[key] ? Object.assign({}, peers[key], meta) : Object.assign({ x: meta.x || WORLD_W / 2, y: meta.y || WORLD_H / 2 }, meta);
+      });
+      peers = next;
+    }
+    function addChatMessage(name, text) {
+      chatMessages.push({ name: name, text: text });
+      if (chatMessages.length > 30) chatMessages.shift();
+      renderChatMessages();
+    }
+    function renderChatMessages() {
+      var box = document.getElementById("chatMessages");
+      box.innerHTML = "";
+      chatMessages.forEach(function (m) {
+        var line = document.createElement("div");
+        line.className = "chatLine";
+        var who = document.createElement("span");
+        who.className = "who"; who.textContent = m.name + ": ";
+        line.appendChild(who);
+        line.appendChild(document.createTextNode(m.text));
+        box.appendChild(line);
+      });
+      box.scrollTop = box.scrollHeight;
+    }
+    function sendChatMessage() {
+      if (!myName) { openIdentityOverlay(); return; }
+      var input = document.getElementById("chatInput");
+      var text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      addChatMessage(myName, text);
+      connectParkChannel();
+      if (parkChannel) parkChannel.send({ type: "broadcast", event: "chat", payload: { id: myClientId, name: myName, text: text } });
+    }
+    async function loadParkCoasters() {
+      var res = await sb.from("coasters").select("*").order("created_at", { ascending: true });
+      parkCoasters = res.data || [];
+    }
+
+    // ---------------- the big park map: places, coasters, avatars, NPCs, search ----------------
+    var WORLD_W = 900, WORLD_H = 500;
+    var PARK_PLACES = [
+      { id: "scallywags", name: "Scallywags", emoji: "🏴‍☠️", x: 90, y: 70, type: "ride" },
+      { id: "scrambler", name: "Space Scrambler", emoji: "🚀", x: 330, y: 60, type: "ride" },
+      { id: "ferris", name: "Ferris Wheel", emoji: "🎡", x: 590, y: 70, type: "ride" },
+      { id: "screamer", name: "Centennial Screamer", emoji: "😱", x: 820, y: 60, type: "ride" },
+      { id: "arcade", name: "Arcade", emoji: "🕹️", x: 180, y: 310, type: "fun", funSet: "arcade" },
+      { id: "bowling", name: "Bowling", emoji: "🎳", x: 420, y: 310, type: "fun", funSet: "bowling" },
+      { id: "skiball", name: "Ski Ball", emoji: "🎯", x: 660, y: 310, type: "fun", funSet: "skiball" },
+      { id: "food1", name: "Snack Shack Food Court", emoji: "🍔", x: 120, y: 430, type: "fun", funSet: "food1" },
+      { id: "food2", name: "Pizza Plaza Food Court", emoji: "🍕", x: 460, y: 440, type: "fun", funSet: "food2" },
+      { id: "food3", name: "Sweet Treats Food Court", emoji: "🍦", x: 780, y: 430, type: "fun", funSet: "food3" },
+    ];
+    function coasterPinFor(coaster, idx) {
+      var perRow = 6;
+      var col = idx % perRow, row = Math.floor(idx / perRow);
+      return { id: "coaster_" + coaster.id, name: coaster.name, emoji: "🎢", x: 80 + col * 140, y: 190 + row * 70, type: "coaster", coaster: coaster };
+    }
+    function allPins() {
+      var pins = PARK_PLACES.slice();
+      parkCoasters.forEach(function (c, i) { pins.push(coasterPinFor(c, i)); });
+      return pins;
+    }
+
+    var NPC_NAMES = ["Sam", "Riley", "Jordan", "Casey", "Taylor"];
+    var NPC_COLORS = ["#c9c9c9", "#a0a0ff", "#ffb3b3", "#b3ffb3", "#ffe0a0"];
+    var NPC_SPEED = 70;
+    var npcs = [];
+    function initNpcs() {
+      npcs = [];
+      for (var i = 0; i < NPC_NAMES.length; i++) {
+        var start = PARK_PLACES[Math.floor(Math.random() * PARK_PLACES.length)];
+        npcs.push({ x: start.x, y: start.y, targetX: start.x, targetY: start.y, color: NPC_COLORS[i], name: NPC_NAMES[i], waitUntil: 0 });
+      }
+    }
+    function stepNpcs(dt) {
+      var now = performance.now();
+      npcs.forEach(function (n) {
+        var dx = n.targetX - n.x, dy = n.targetY - n.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 6) {
+          if (now > n.waitUntil) {
+            var pins = allPins();
+            var next = pins[Math.floor(Math.random() * pins.length)];
+            n.targetX = next.x; n.targetY = next.y;
+            n.waitUntil = now + 1500 + Math.random() * 2000;
+          }
+        } else {
+          var step = NPC_SPEED * dt;
+          n.x += (dx / dist) * Math.min(step, dist);
+          n.y += (dy / dist) * Math.min(step, dist);
+        }
+      });
+    }
+
+    var PARK_CANVAS_W = 480, PARK_CANVAS_H = 300;
+    var myWorldX = WORLD_W / 2, myWorldY = WORLD_H / 2;
+    var walkTargetX = null, walkTargetY = null;
+    var WALK_SPEED = 130;
+    var LEASH_DIST = 160;
+    var ARRIVAL_DIST = 44;
+    var lastMoveBroadcast = 0;
+    var lastFrameTime = 0;
+    var parkCtx = null;
+    var parkAnimId = null;
+    var lastArrivalPinId = null;
+    var guideTargetPin = null;
+
+    function initParkCanvas() {
+      var canvas = document.getElementById("parkCanvas");
+      canvas.width = PARK_CANVAS_W; canvas.height = PARK_CANVAS_H;
+      parkCtx = canvas.getContext("2d");
+    }
+    async function enterPark() {
+      if (!myName) { openIdentityOverlay(enterPark); return; }
+      if (!parkCtx) initParkCanvas();
+      connectParkChannel();
+      await loadParkCoasters();
+      if (!npcs.length) initNpcs();
+      showScreen("screen-park");
+      lastFrameTime = 0;
+      if (parkAnimId) cancelAnimationFrame(parkAnimId);
+      parkAnimId = requestAnimationFrame(parkFrame);
+    }
+    function leavePark() {
+      if (parkAnimId) cancelAnimationFrame(parkAnimId);
+      showScreen("screen-home");
+    }
+    function worldFromPointerEvent(e, canvas) {
+      var rect = canvas.getBoundingClientRect();
+      var scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+      var screenX = (e.clientX - rect.left) * scaleX, screenY = (e.clientY - rect.top) * scaleY;
+      var camX = clampNum(myWorldX - PARK_CANVAS_W / 2, 0, Math.max(0, WORLD_W - PARK_CANVAS_W));
+      var camY = clampNum(myWorldY - PARK_CANVAS_H / 2, 0, Math.max(0, WORLD_H - PARK_CANVAS_H));
+      return { x: clampNum(screenX + camX, 0, WORLD_W), y: clampNum(screenY + camY, 0, WORLD_H) };
+    }
+    function distanceToPin(pin) { return Math.sqrt(Math.pow(pin.x - myWorldX, 2) + Math.pow(pin.y - myWorldY, 2)); }
+    function searchPark() {
+      var q = document.getElementById("searchInput").value.trim().toLowerCase();
+      var status = document.getElementById("searchStatus");
+      if (!q) { status.textContent = "Type something to search!"; return; }
+      var matches = allPins().filter(function (p) { return p.name.toLowerCase().indexOf(q) !== -1; });
+      if (matches.length === 0) { status.textContent = "😅 Couldn't find that. Try another name!"; guideTargetPin = null; return; }
+      matches.sort(function (a, b) { return distanceToPin(a) - distanceToPin(b); });
+      guideTargetPin = matches[0];
+      status.textContent = "➡️ Follow the arrow to " + matches[0].name + "!";
+    }
+    function checkArrival() {
+      var pins = allPins();
+      var found = null;
+      for (var i = 0; i < pins.length; i++) {
+        if (Math.sqrt(Math.pow(pins[i].x - myWorldX, 2) + Math.pow(pins[i].y - myWorldY, 2)) < ARRIVAL_DIST) { found = pins[i]; break; }
+      }
+      var box = document.getElementById("parkArrival");
+      if (found) {
+        if (lastArrivalPinId !== found.id) { lastArrivalPinId = found.id; renderArrivalPrompt(found); }
+        box.classList.add("show");
+      } else {
+        lastArrivalPinId = null;
+        box.classList.remove("show");
+      }
+      if (guideTargetPin && distanceToPin(guideTargetPin) < ARRIVAL_DIST) {
+        guideTargetPin = null;
+        document.getElementById("searchStatus").textContent = "You made it! 🎉";
+      }
+    }
+    function renderArrivalPrompt(pin) {
+      var box = document.getElementById("parkArrival");
+      box.innerHTML = "";
+      var label = document.createElement("div");
+      label.textContent = pin.emoji + " " + pin.name;
+      box.appendChild(label);
+      if (pin.type === "coaster") {
+        var btn = document.createElement("button");
+        btn.className = "btn small";
+        btn.textContent = "🎫 Ride This Coaster!";
+        btn.addEventListener("click", function () { rideCoasterTogether(pin.coaster); });
+        box.appendChild(btn);
+      } else if (pin.type === "fun") {
+        var btn2 = document.createElement("button");
+        btn2.className = "btn small";
+        btn2.textContent = "▶️ Visit";
+        btn2.addEventListener("click", function () { openFunScreen(pin.funSet, true); });
+        box.appendChild(btn2);
+      } else if (pin.type === "ride") {
+        playWhooshUp();
+        var line = document.createElement("div");
+        line.style.fontSize = "0.75rem";
+        line.textContent = "Wheee! 🎉";
+        box.appendChild(line);
+      }
+    }
+    function stepMyMovement(dt) {
+      if (walkTargetX != null) {
+        var dx = walkTargetX - myWorldX, dy = walkTargetY - myWorldY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 4) { myWorldX = walkTargetX; myWorldY = walkTargetY; walkTargetX = null; walkTargetY = null; }
+        else {
+          var step = WALK_SPEED * dt;
+          myWorldX += (dx / dist) * Math.min(step, dist);
+          myWorldY += (dy / dist) * Math.min(step, dist);
+        }
+        var now = performance.now();
+        if (parkChannel && now - lastMoveBroadcast > 150) {
+          lastMoveBroadcast = now;
+          parkChannel.send({ type: "broadcast", event: "move", payload: { id: myClientId, x: myWorldX, y: myWorldY } });
+        }
+      }
+      checkArrival();
+    }
+    function leashedPos(entity) {
+      var dx = entity.x - myWorldX, dy = entity.y - myWorldY;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= LEASH_DIST || dist === 0) return { x: entity.x, y: entity.y };
+      var ratio = LEASH_DIST / dist;
+      return { x: myWorldX + dx * ratio, y: myWorldY + dy * ratio };
+    }
+    function drawPin(p, sx, sy) {
+      if (sx < -30 || sx > PARK_CANVAS_W + 30 || sy < -30 || sy > PARK_CANVAS_H + 30) return;
+      var ctx = parkCtx;
+      ctx.font = "26px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(p.emoji, sx, sy);
+      ctx.font = "bold 9px sans-serif"; ctx.fillStyle = "#fff";
+      ctx.fillText(p.name, sx, sy + 16);
+    }
+    function drawAvatar(pos, color, fallbackEmoji, name, camX, camY, isMe) {
+      var sx = pos.x - camX, sy = pos.y - camY;
+      var ctx = parkCtx;
+      if (fallbackEmoji) {
+        ctx.font = "22px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(fallbackEmoji, sx, sy + 8);
+        ctx.beginPath(); ctx.arc(sx + 12, sy - 10, 6, 0, Math.PI * 2);
+        ctx.fillStyle = color || "#fff"; ctx.fill();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = "#fff"; ctx.font = "bold 8px sans-serif"; ctx.fillText("X", sx + 12, sy - 7);
+      } else {
+        ctx.beginPath(); ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+        ctx.fillStyle = color || "#fff"; ctx.fill();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+      }
+      if (name) {
+        ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+        ctx.fillText(name, sx, sy - (fallbackEmoji ? 20 : 16));
+      }
+      if (isMe) {
+        ctx.beginPath(); ctx.arc(sx, sy, 14, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,215,107,0.9)"; ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+    function drawGuideArrow(pin, camX, camY) {
+      var ctx = parkCtx;
+      var angle = Math.atan2(pin.y - myWorldY, pin.x - myWorldX);
+      var mySx = myWorldX - camX, mySy = myWorldY - camY;
+      var ax = mySx + Math.cos(angle) * 30, ay = mySy + Math.sin(angle) * 30;
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#ffd76b";
+      ctx.beginPath();
+      ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    function renderParkFrame() {
+      var ctx = parkCtx;
+      ctx.clearRect(0, 0, PARK_CANVAS_W, PARK_CANVAS_H);
+      var camX = clampNum(myWorldX - PARK_CANVAS_W / 2, 0, Math.max(0, WORLD_W - PARK_CANVAS_W));
+      var camY = clampNum(myWorldY - PARK_CANVAS_H / 2, 0, Math.max(0, WORLD_H - PARK_CANVAS_H));
+
+      var grad = ctx.createLinearGradient(0, 0, 0, PARK_CANVAS_H);
+      grad.addColorStop(0, "#7fd858"); grad.addColorStop(1, "#4fae3a");
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, PARK_CANVAS_W, PARK_CANVAS_H);
+
+      ctx.fillStyle = "rgba(210,190,150,0.5)";
+      ctx.fillRect(0 - camX, 150 - camY, WORLD_W, 40);
+      ctx.fillRect(0 - camX, 270 - camY, WORLD_W, 40);
+      ctx.fillRect(0 - camX, 390 - camY, WORLD_W, 40);
+
+      allPins().forEach(function (p) { drawPin(p, p.x - camX, p.y - camY); });
+
+      npcs.forEach(function (n) {
+        var pos = leashedPos(n);
+        drawAvatar(pos, n.color, null, n.name, camX, camY, false);
+      });
+      Object.keys(peers).forEach(function (key) {
+        var peer = peers[key];
+        var pos = leashedPos(peer);
+        drawAvatar(pos, peer.color, peer.colorTaken ? peer.emoji : null, peer.name, camX, camY, false);
+      });
+      drawAvatar({ x: myWorldX, y: myWorldY }, myColor, myColorTaken ? myEmoji : null, myName, camX, camY, true);
+
+      if (guideTargetPin) drawGuideArrow(guideTargetPin, camX, camY);
+    }
+    function parkFrame(ts) {
+      var dt = lastFrameTime ? (ts - lastFrameTime) / 1000 : 0;
+      lastFrameTime = ts;
+      stepMyMovement(Math.min(dt, 0.1));
+      stepNpcs(Math.min(dt, 0.1));
+      renderParkFrame();
+      parkAnimId = requestAnimationFrame(parkFrame);
+    }
+
+    // ---------------- ride a built coaster together, found via the park map ----------------
+    var roomLaunchedFromPark = false;
+    async function rideCoasterTogether(coaster) {
+      var code = "C" + coaster.id;
+      var existing = await sb.from("rooms").select("*").eq("code", code).maybeSingle();
+      if (!existing.data) await sb.from("rooms").insert({ code: code, track: coaster.heights, name: coaster.name });
+      currentRoomCode = code;
+      isHostOfRoom = true;
+      roomLaunchedFromPark = true;
+      joinedMembers = [];
+      document.getElementById("hostCodeDisplay").textContent = coaster.name;
+      document.getElementById("hostLobbyInstructions").textContent = "Waiting for friends to walk up and ride " + coaster.name + " with you!";
+      renderMemberChips();
+      subscribeToRoom(code);
+      showScreen("screen-hostLobby");
+      await sb.from("room_members").insert({ code: code, name: myName || "Friend" });
+      if (joinedMembers.indexOf(myName) === -1) joinedMembers.push(myName || "Friend");
+      renderMemberChips();
     }
 
     // ---------------- wiring ----------------
@@ -642,7 +1212,7 @@
         var card = document.createElement("div");
         card.className = "templateCard";
         card.innerHTML = '<span class="emo">' + t.emoji + '</span><span class="name">' + t.name + '</span>';
-        card.addEventListener("click", function () { beginRide(t.heights, 0); });
+        card.addEventListener("click", function () { beginRide(t.heights, 0, t.name); });
         list.appendChild(card);
       });
       showScreen("screen-templates");
@@ -651,7 +1221,7 @@
     document.getElementById("homeMineBtn").addEventListener("click", function () {
       var track = loadMyTrack();
       if (!track) { openBuilder(); return; }
-      beginRide(track, 0);
+      beginRide(track, 0, window.localStorage.getItem("coasterPartyMyTrackName") || "My Coaster");
     });
     document.getElementById("homeJoinBtn").addEventListener("click", function () {
       document.getElementById("joinNameInput").value = "";
@@ -659,17 +1229,56 @@
       document.getElementById("joinStatus").textContent = "";
       showScreen("screen-join");
     });
-    document.getElementById("homeFoodBtn").addEventListener("click", function () {
-      renderFoodGrid();
-      document.getElementById("foodReaction").textContent = "";
-      document.getElementById("foodCount").textContent = foodOrderCount > 0 ? ("You've tried " + foodOrderCount + " things today!") : "";
-      showScreen("screen-food");
+    document.getElementById("homeFoodBtn").addEventListener("click", function () { openFunScreen("food1", false); });
+    document.getElementById("foodBackBtn").addEventListener("click", function () { showScreen(funScreenReturnTo); });
+
+    document.getElementById("homeParkBtn").addEventListener("click", function () { enterPark(); });
+    document.getElementById("parkBackBtn").addEventListener("click", function () { leavePark(); });
+    document.getElementById("searchGoBtn").addEventListener("click", searchPark);
+    document.getElementById("searchInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); searchPark(); } });
+    (function () {
+      var canvas = document.getElementById("parkCanvas");
+      canvas.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        var pt = worldFromPointerEvent(e, canvas);
+        walkTargetX = pt.x; walkTargetY = pt.y;
+      });
+    })();
+
+    document.getElementById("identitySaveBtn").addEventListener("click", function () {
+      var name = document.getElementById("playerNameInput").value.trim();
+      if (!name) return;
+      myName = name;
+      myColor = pickedColorInSetup || AVATAR_COLORS[0];
+      myEmoji = pickedEmojiInSetup || AVATAR_EMOJIS[0];
+      savePlayer();
+      document.getElementById("identityOverlay").classList.remove("show");
+      if (parkChannel) {
+        // already connected (e.g. re-opened identity while in the park) — re-check the color
+        // collision and re-broadcast presence with the updated info; connectParkChannel() alone
+        // would no-op here since it only subscribes once.
+        myColorTaken = !!currentlyTakenColors()[myColor];
+        parkChannel.track({ name: myName, color: myColor, emoji: myEmoji, colorTaken: myColorTaken, x: myWorldX, y: myWorldY });
+      } else {
+        connectParkChannel();
+      }
+      var next = identityThen; identityThen = null;
+      if (next) next();
     });
-    document.getElementById("foodBackBtn").addEventListener("click", function () { showScreen("screen-home"); });
+    document.getElementById("chatToggleBtn").addEventListener("click", function () {
+      document.getElementById("chatPanel").classList.toggle("open");
+    });
+    document.getElementById("chatSendBtn").addEventListener("click", sendChatMessage);
+    document.getElementById("chatInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); sendChatMessage(); } });
 
     document.getElementById("builderCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
-    document.getElementById("builderSaveBtn").addEventListener("click", function () {
+    document.getElementById("builderSaveBtn").addEventListener("click", async function () {
+      var name = document.getElementById("coasterNameInput").value.trim() || "My Awesome Coaster";
       saveMyTrack(builderHeights);
+      window.localStorage.setItem("coasterPartyMyTrackName", name);
+      var builderName = myName || "A Kid";
+      var res = await sb.from("coasters").insert({ name: name, heights: builderHeights, builder_name: builderName }).select();
+      if (res.data && res.data[0]) parkCoasters.push(res.data[0]);
       showScreen("screen-saved");
     });
     document.getElementById("modeDrawBtn").addEventListener("click", function () { builderMode = "draw"; renderModeButtons(); });
@@ -683,8 +1292,8 @@
       canvas.addEventListener("pointerleave", function () { dragging = false; });
     })();
 
-    document.getElementById("savedRideBtn").addEventListener("click", function () { beginRide(loadMyTrack(), 0); });
-    document.getElementById("savedHostBtn").addEventListener("click", function () { hostLiveRoom(loadMyTrack()); });
+    document.getElementById("savedRideBtn").addEventListener("click", function () { beginRide(loadMyTrack(), 0, window.localStorage.getItem("coasterPartyMyTrackName") || "My Coaster"); });
+    document.getElementById("savedHostBtn").addEventListener("click", function () { hostLiveRoom(loadMyTrack(), window.localStorage.getItem("coasterPartyMyTrackName") || "My Coaster"); });
     document.getElementById("savedHomeBtn").addEventListener("click", function () { showScreen("screen-home"); });
 
     document.getElementById("joinCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
@@ -700,13 +1309,18 @@
 
     document.getElementById("rideRetryBtn").addEventListener("click", function () {
       document.getElementById("rideOverlay").classList.remove("show");
-      beginRide(rideHeights, 0);
+      beginRide(rideHeights, 0, rideCoasterName);
     });
     document.getElementById("rideHomeBtn").addEventListener("click", function () {
       document.getElementById("rideOverlay").classList.remove("show");
       leaveRoom();
       showScreen("screen-home");
     });
+
+    // ---------------- init ----------------
+    // If we already know who this player is, connect to the shared chat/presence channel right
+    // away so the persistent chat bar works from the Home screen onward, not just inside the park.
+    if (loadPlayer()) connectParkChannel();
   </script>
 </body>
 </html>
