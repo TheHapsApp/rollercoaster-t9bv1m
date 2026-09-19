@@ -72,11 +72,12 @@
   #memberList { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 320px; }
   .memberChip { background: rgba(255,255,255,0.16); border: 2px solid #fff; border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; font-weight: bold; }
 
-  #templateList, #myCoastersList { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  #templateList, #myCoastersList, #coasterNamePicker { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; margin-bottom: 12px; }
   .templateCard {
     display: flex; align-items: center; gap: 10px; text-align: left;
     background: rgba(255,255,255,0.12); border: 3px solid #fff; border-radius: 16px; padding: 10px 14px; cursor: pointer;
   }
+  .templateCard.selected { background: rgba(255,215,107,0.3); border-color: #ffd76b; }
   .templateCard .emo { font-size: 1.8rem; }
   .templateCard .name { font-weight: bold; font-size: 1rem; }
 
@@ -218,6 +219,18 @@
     </div>
     <div id="myCoastersList"></div>
     <div id="myCoastersEmpty" style="display:none; opacity:0.85; margin-top:30px; font-size:0.9rem;">You haven't built a coaster yet! Tap "➕ New" above to make your first one. 🎢</div>
+  </div>
+
+  <!-- ==================== PICK A COASTER NAME (before building) ==================== -->
+  <div class="screen" id="screen-nameCoaster">
+    <div class="topBar">
+      <button class="btn" id="nameCoasterCancelBtn">✖ Cancel</button>
+      <div class="title">🎢 Pick a Name</div>
+      <div style="width:70px;"></div>
+    </div>
+    <div style="font-size:0.85rem; opacity:0.85; margin-bottom:6px;">Tap the roller coaster you want to build:</div>
+    <div id="coasterNamePicker"></div>
+    <button class="btn wide" id="nameCoasterCreateBtn" disabled>✅ Create</button>
   </div>
 
   <!-- ==================== JOIN ==================== -->
@@ -744,15 +757,54 @@
     var lastSavedCoaster = null; // whichever coaster was JUST built — screen-saved's buttons act on this one specifically
     // Every visit to the builder starts a brand new blank coaster now — since you can build as many
     // as you want, there's no single "the" coaster to resume/overwrite anymore (see addMyCoaster).
-    function openBuilder() {
+    function openBuilder(prefillName) {
       builderHeights = newFlatTrack();
       builderLoops = noLoops(builderHeights.length);
-      document.getElementById("coasterNameInput").value = "";
+      document.getElementById("coasterNameInput").value = prefillName || "";
       builderMode = "draw";
       if (!builderCtx) initBuilderCanvas();
       renderBuilder();
       renderModeButtons();
       showScreen("screen-builder");
+    }
+
+    // ---------------- pick a name before building (real Lagoon-style coaster names, or your own) ----------------
+    var PRESET_COASTER_NAMES = [
+      { name: "Cannibal", emoji: "👹" },
+      { name: "Wicked", emoji: "😈" },
+      { name: "Colossus: The Fire Dragon", emoji: "🐉" },
+      { name: "Spider", emoji: "🕷️" },
+    ];
+    var selectedPresetName = null; // null = nothing picked yet, "" = "type my own", else a preset name
+    function openNameCoaster() {
+      selectedPresetName = null;
+      renderCoasterNamePicker();
+      document.getElementById("nameCoasterCreateBtn").disabled = true;
+      showScreen("screen-nameCoaster");
+    }
+    function renderCoasterNamePicker() {
+      var grid = document.getElementById("coasterNamePicker");
+      grid.innerHTML = "";
+      PRESET_COASTER_NAMES.forEach(function (p) {
+        var card = document.createElement("div");
+        card.className = "templateCard" + (selectedPresetName === p.name ? " selected" : "");
+        card.innerHTML = '<span class="emo">' + p.emoji + '</span><span class="name">' + p.name + '</span>';
+        card.addEventListener("click", function () {
+          selectedPresetName = p.name;
+          document.getElementById("nameCoasterCreateBtn").disabled = false;
+          renderCoasterNamePicker();
+        });
+        grid.appendChild(card);
+      });
+      var customCard = document.createElement("div");
+      customCard.className = "templateCard" + (selectedPresetName === "" ? " selected" : "");
+      customCard.innerHTML = '<span class="emo">📝</span><span class="name">Type My Own Name</span>';
+      customCard.addEventListener("click", function () {
+        selectedPresetName = "";
+        document.getElementById("nameCoasterCreateBtn").disabled = false;
+        renderCoasterNamePicker();
+      });
+      grid.appendChild(customCard);
     }
     function renderModeButtons() {
       document.getElementById("modeEraseBtn").className = "btn" + (builderMode === "erase" ? " danger" : "");
@@ -1449,7 +1501,7 @@
     document.getElementById("homeBuildBtn").addEventListener("click", function () {
       playClickSound();
       builderReturnTo = "screen-home";
-      openBuilder();
+      openNameCoaster();
     });
     document.getElementById("homeComputerBtn").addEventListener("click", function () {
       playClickSound();
@@ -1469,8 +1521,8 @@
     document.getElementById("myCoastersCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
     document.getElementById("myCoastersBuildNewBtn").addEventListener("click", function () {
       playClickSound();
-      builderReturnTo = "screen-home";
-      openBuilder();
+      builderReturnTo = "screen-mycoasters";
+      openNameCoaster();
     });
     document.getElementById("homeJoinBtn").addEventListener("click", function () {
       document.getElementById("joinNameInput").value = "";
@@ -1488,7 +1540,15 @@
       pendingBuildX = myWorldX; pendingBuildY = myWorldY;
       builderReturnTo = "screen-park";
       if (parkAnimId) cancelAnimationFrame(parkAnimId);
-      openBuilder();
+      openNameCoaster();
+    });
+    document.getElementById("nameCoasterCancelBtn").addEventListener("click", function () {
+      pendingBuildX = null; pendingBuildY = null;
+      showScreen(builderReturnTo);
+    });
+    document.getElementById("nameCoasterCreateBtn").addEventListener("click", function () {
+      if (selectedPresetName === null) return;
+      openBuilder(selectedPresetName);
     });
     document.getElementById("searchGoBtn").addEventListener("click", searchPark);
     document.getElementById("searchInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); searchPark(); } });
