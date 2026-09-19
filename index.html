@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Coaster Party!</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%A2%3C/text%3E%3C/svg%3E">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  body {
+    font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+    min-height: 100vh; color: #fff;
+    background: linear-gradient(120deg, #1b1140, #6a2c8f, #d94f9a);
+    background-size: 300% 300%; animation: flow 16s ease infinite;
+    padding: 14px 12px 40px; text-align: center;
+  }
+  @keyframes flow { 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
+  h1 { font-size: clamp(1.4rem, 6vw, 2rem); text-shadow: 3px 3px 0 rgba(0,0,0,0.3); margin-bottom: 4px; }
+  .sub { font-size: 0.85rem; opacity: 0.85; margin-bottom: 16px; }
+  .btn {
+    font-family: inherit; font-weight: bold; font-size: 0.95rem; color: #2a1650;
+    background: #ffd76b; border: 3px solid #fff; border-radius: 16px;
+    padding: 10px 16px; margin: 5px; cursor: pointer;
+    box-shadow: 0 5px 0 rgba(0,0,0,0.3);
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn.danger { background: #ff8080; }
+  .btn.wide { display: block; width: 100%; max-width: 380px; margin: 8px auto; font-size: 1.05rem; }
+  .screen { display: none; max-width: 480px; margin: 0 auto; }
+  .screen.active { display: block; }
+  .menuGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+  .menuGrid .bigBtn {
+    font-family: inherit; font-weight: bold; color: #fff; background: rgba(255,255,255,0.14);
+    border: 3px solid #fff; border-radius: 18px; padding: 18px 10px; cursor: pointer; font-size: 0.95rem;
+  }
+  .menuGrid .bigBtn .emo { font-size: 2.2rem; display: block; margin-bottom: 6px; }
+  .menuGrid .bigBtn:active { transform: translateY(3px); }
+  .topBar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .topBar .title { font-weight: bold; font-size: 1.05rem; }
+
+  #builderWrap { width: 100%; aspect-ratio: 24/11; border: 4px solid #fff; border-radius: 14px; overflow: hidden; background: #12163a; }
+  #builderCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
+  .modeRow { display: flex; justify-content: center; gap: 6px; margin: 10px 0; }
+
+  #rideWrap { width: 100%; aspect-ratio: 16/9; border: 4px solid #fff; border-radius: 14px; overflow: hidden; position: relative; background: #000; }
+  #rideCanvas { width: 100%; height: 100%; display: block; }
+  #rideOverlay {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px; background: rgba(10,5,25,0.82); padding: 16px; text-align: center;
+  }
+  #rideOverlay.show { display: flex; }
+  #rideOverlay .bigMsg { font-size: 1.4rem; font-weight: bold; text-shadow: 3px 3px 0 rgba(0,0,0,0.3); }
+  #progressBarWrap { width: 100%; height: 10px; background: rgba(255,255,255,0.2); border-radius: 6px; margin: 8px 0 4px; overflow: hidden; }
+  #progressBarFill { height: 100%; background: #ffd76b; width: 0%; }
+
+  .overlay {
+    display: none; position: fixed; inset: 0; z-index: 60; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px; background: rgba(15, 8, 30, 0.94); padding: 16px; overflow-y: auto; text-align: center;
+  }
+  .overlay.show { display: flex; }
+  .overlay .bigTitle { font-size: 1.2rem; font-weight: bold; }
+  #codeInput, #nameInput {
+    font-family: inherit; font-size: 1.3rem; font-weight: bold; text-align: center; letter-spacing: 3px;
+    padding: 10px; border-radius: 12px; border: 3px solid #fff; width: 90%; max-width: 260px;
+    background: rgba(255,255,255,0.95); color: #2a1650; text-transform: uppercase;
+  }
+  #nameInput { text-transform: none; letter-spacing: normal; font-size: 1.05rem; }
+  .roomCodeBig { font-size: 2.6rem; font-weight: bold; letter-spacing: 6px; text-shadow: 3px 3px 0 rgba(0,0,0,0.3); }
+  #memberList { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 320px; }
+  .memberChip { background: rgba(255,255,255,0.16); border: 2px solid #fff; border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; font-weight: bold; }
+
+  #templateList { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .templateCard {
+    display: flex; align-items: center; gap: 10px; text-align: left;
+    background: rgba(255,255,255,0.12); border: 3px solid #fff; border-radius: 16px; padding: 10px 14px; cursor: pointer;
+  }
+  .templateCard .emo { font-size: 1.8rem; }
+  .templateCard .name { font-weight: bold; font-size: 1rem; }
+
+  #foodGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+  .foodBtn {
+    font-family: inherit; background: rgba(255,255,255,0.14); border: 3px solid #fff; border-radius: 16px;
+    padding: 16px 4px; cursor: pointer; font-size: 2rem;
+  }
+  .foodBtn:active { transform: translateY(3px); }
+  #foodReaction { font-size: 1.1rem; font-weight: bold; min-height: 1.6em; margin-top: 10px; }
+  #foodCount { font-size: 0.85rem; opacity: 0.85; }
+
+  footer { margin-top: 20px; font-size: 0.78rem; opacity: 0.7; }
+</style>
+</head>
+<body>
+
+  <h1>🎢 Coaster Party!</h1>
+  <div class="sub">Build it, ride it, share it with friends</div>
+
+  <!-- ==================== HOME ==================== -->
+  <div class="screen active" id="screen-home">
+    <div class="menuGrid">
+      <button class="bigBtn" id="homeBuildBtn"><span class="emo">🛠️</span>Build a Coaster</button>
+      <button class="bigBtn" id="homeComputerBtn"><span class="emo">🖥️</span>Ride a Computer-Built One</button>
+      <button class="bigBtn" id="homeMineBtn"><span class="emo">🎫</span>Ride Your Own</button>
+      <button class="bigBtn" id="homeJoinBtn"><span class="emo">👥</span>Join a Friend</button>
+      <button class="bigBtn" id="homeFoodBtn" style="grid-column: 1 / -1;"><span class="emo">🍔</span>Food Court</button>
+    </div>
+  </div>
+
+  <!-- ==================== BUILDER ==================== -->
+  <div class="screen" id="screen-builder">
+    <div class="topBar">
+      <button class="btn" id="builderCancelBtn">✖ Cancel</button>
+      <div class="title">🛠️ Build Your Coaster</div>
+      <button class="btn" id="builderSaveBtn">💾 Save</button>
+    </div>
+    <div id="builderWrap"><canvas id="builderCanvas"></canvas></div>
+    <div class="modeRow">
+      <button class="btn" id="modeDrawBtn">✏️ Draw Track</button>
+      <button class="btn" id="modeEraseBtn">🗑️ Erase (Make a Gap!)</button>
+    </div>
+    <div style="font-size:0.8rem; opacity:0.85;">Drag up and down to build hills. Erase a spot to leave a gap — go on too fast and you'll fly right off! 💥</div>
+  </div>
+
+  <!-- ==================== SAVED-TRACK PROMPT ==================== -->
+  <div class="screen" id="screen-saved">
+    <div style="font-size:1.3rem; font-weight:bold; margin: 30px 0 6px;">💾 Coaster Saved!</div>
+    <button class="btn wide" id="savedRideBtn">▶️ Ride It Myself</button>
+    <button class="btn wide" id="savedHostBtn">👥 Invite Friends (Host a Live Ride)</button>
+    <button class="btn wide" id="savedHomeBtn">🏠 Home</button>
+  </div>
+
+  <!-- ==================== COMPUTER TEMPLATE PICKER ==================== -->
+  <div class="screen" id="screen-templates">
+    <div class="topBar">
+      <button class="btn" id="templatesCancelBtn">✖ Back</button>
+      <div class="title">🖥️ Pick a Coaster</div>
+      <div style="width:70px;"></div>
+    </div>
+    <div id="templateList"></div>
+  </div>
+
+  <!-- ==================== JOIN ==================== -->
+  <div class="screen" id="screen-join">
+    <div class="topBar">
+      <button class="btn" id="joinCancelBtn">✖ Back</button>
+      <div class="title">👥 Join a Friend</div>
+      <div style="width:70px;"></div>
+    </div>
+    <div style="margin: 20px 0 10px;">Enter your name:</div>
+    <input type="text" id="joinNameInput" maxlength="16" placeholder="Your name">
+    <div style="margin: 18px 0 10px;">Enter the coaster code:</div>
+    <input type="text" id="codeInput" maxlength="4" placeholder="CODE">
+    <div id="joinStatus" style="min-height:1.4em; font-size:0.9rem; margin-top:8px;"></div>
+    <button class="btn wide" id="joinGoBtn">✅ Join!</button>
+  </div>
+
+  <!-- ==================== HOST LOBBY ==================== -->
+  <div class="screen" id="screen-hostLobby">
+    <div class="title" style="margin-bottom:10px;">👥 Waiting for Friends</div>
+    <div style="font-size:0.85rem; opacity:0.9;">Tell your friends to tap "Join a Friend" and type this code:</div>
+    <div class="roomCodeBig" id="hostCodeDisplay">----</div>
+    <div id="hostMemberList" class="memberChip-wrap"><div id="memberListHost" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:320px;margin:10px auto;"></div></div>
+    <button class="btn wide" id="hostStartBtn">🚀 Start the Ride!</button>
+    <button class="btn wide" id="hostCancelBtn">✖ Cancel</button>
+  </div>
+
+  <!-- ==================== GUEST WAITING ==================== -->
+  <div class="screen" id="screen-guestWait">
+    <div class="title" style="margin-bottom:10px;">👥 You're In!</div>
+    <div style="font-size:0.9rem;">Waiting for the host to start the ride...</div>
+    <div id="memberListGuest" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:320px;margin:14px auto;"></div>
+    <button class="btn wide" id="guestCancelBtn">✖ Leave</button>
+  </div>
+
+  <!-- ==================== RIDE ==================== -->
+  <div class="screen" id="screen-ride">
+    <div id="progressBarWrap"><div id="progressBarFill"></div></div>
+    <div id="rideWrap">
+      <canvas id="rideCanvas"></canvas>
+      <div id="rideOverlay">
+        <div class="bigMsg" id="rideOverlayMsg"></div>
+        <button class="btn" id="rideRetryBtn">🔁 Try Again</button>
+        <button class="btn" id="rideHomeBtn">🏠 Home</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== FOOD COURT ==================== -->
+  <div class="screen" id="screen-food">
+    <div class="topBar">
+      <button class="btn" id="foodBackBtn">✖ Back</button>
+      <div class="title">🍔 Food Court</div>
+      <div style="width:70px;"></div>
+    </div>
+    <div id="foodGrid"></div>
+    <div id="foodReaction"></div>
+    <div id="foodCount"></div>
+  </div>
+
+  <footer>Coaster Party! 🎢</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    var SUPABASE_URL = "https://mjgnhvatyughyamuhsyw.supabase.co";
+    var SUPABASE_KEY = "sb_publishable_K9NzviZwqhmT3Dkium3TXg_jceFIfbe";
+    var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    var TRACK_COLS = 24;
+    var MIN_HEIGHT = 1, MAX_HEIGHT = 7, DEFAULT_HEIGHT = 3;
+    var MY_TRACK_KEY = "coasterPartyMyTrack";
+
+    // ---------------- procedural sound (Web Audio, no audio files) ----------------
+    var audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) audioCtx = new AC(); }
+      return audioCtx;
+    }
+    function tone(freqStart, freqEnd, t, dur, type, gain) {
+      var ctx = getAudioCtx(); if (!ctx) return;
+      var osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = type || "sine";
+      osc.frequency.setValueAtTime(freqStart, ctx.currentTime + t);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), ctx.currentTime + t + dur);
+      g.gain.setValueAtTime(gain || 0.25, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + dur);
+    }
+    function playClickSound() { tone(500, 500, 0, 0.06, "triangle", 0.15); }
+    function playWhooshUp() { tone(300, 700, 0, 0.3, "sine", 0.15); }
+    function playCrashSound() {
+      tone(400, 60, 0, 0.6, "sawtooth", 0.3);
+      tone(200, 40, 0.1, 0.5, "square", 0.2);
+    }
+    function playCelebrateSound() {
+      [0, 0.12, 0.24, 0.36].forEach(function (t, i) { tone(500 + i * 120, 500 + i * 120, t, 0.18, "triangle", 0.22); });
+    }
+    function playYumSound() { tone(700, 900, 0, 0.15, "triangle", 0.2); }
+
+    // ---------------- screens ----------------
+    function showScreen(id) {
+      document.querySelectorAll(".screen").forEach(function (el) { el.classList.remove("active"); });
+      document.getElementById(id).classList.add("active");
+    }
+    function closeAllOverlays() {
+      document.querySelectorAll(".overlay").forEach(function (el) { el.classList.remove("show"); });
+    }
+
+    // ---------------- track helpers ----------------
+    function newFlatTrack() {
+      var arr = [];
+      for (var i = 0; i < TRACK_COLS; i++) arr.push(DEFAULT_HEIGHT);
+      return arr;
+    }
+    function loadMyTrack() {
+      try {
+        var raw = window.localStorage.getItem(MY_TRACK_KEY);
+        var parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed) && parsed.length === TRACK_COLS) return parsed;
+      } catch (e) {}
+      return null;
+    }
+    function saveMyTrack(heights) {
+      try { window.localStorage.setItem(MY_TRACK_KEY, JSON.stringify(heights)); } catch (e) {}
+    }
+    // For pacing/visual interpolation only — fills gaps with the nearest real track height so the
+    // approach to a gap still looks like a continuous hill right up to the edge. Crash detection
+    // always reads the ORIGINAL heights array (with real nulls), never this fallback version.
+    function fallbackHeights(heights) {
+      var out = heights.slice();
+      for (var i = 0; i < out.length; i++) {
+        if (out[i] == null) {
+          var j = i - 1; while (j >= 0 && out[j] == null) j--;
+          var k = i + 1; while (k < out.length && heights[k] == null) k++;
+          out[i] = j >= 0 ? out[j] : (k < out.length ? heights[k] : DEFAULT_HEIGHT);
+        }
+      }
+      return out;
+    }
+
+    // ---------------- computer-built templates ----------------
+    var COMPUTER_COASTERS = [
+      { id: "wavy", name: "Wavy Wonder", emoji: "🌊",
+        heights: [4,5,6,7,6,5,4,3,2,3,4,5,6,7,6,5,4,3,2,3,4,5,6,4] },
+      { id: "mountain", name: "Mountain Madness", emoji: "🏔️",
+        heights: [2,3,4,5,6,7,7,7,7,7,2,2,3,4,5,4,3,5,6,4,3,4,3,2] },
+      { id: "zigzag", name: "Zigzag Thrill", emoji: "⚡",
+        heights: [3,6,2,7,3,6,2,7,3,6,2,7,3,6,2,7,3,6,2,7,3,5,3,2] },
+      { id: "rocket", name: "Rocket Launch", emoji: "🚀",
+        heights: [1,1,2,2,3,4,5,6,7,7,7,7,6,5,4,3,2,1,1,2,2,3,3,2] },
+    ];
+
+    // ---------------- ride timeline: deterministic, so every device computes the SAME position at
+    // the SAME elapsed time from just the shared track data — this is what keeps a live multiplayer
+    // ride in sync without needing to broadcast position every frame. ----------------
+    var BASE_SPEED = 3.2, SLOPE_FACTOR = 1.4, MIN_SPEED = 1.2, MAX_SPEED = 6.5;
+    function clampNum(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+    function buildRideTimeline(fbHeights) {
+      var times = [0];
+      for (var i = 1; i < fbHeights.length; i++) {
+        var slope = fbHeights[i] - fbHeights[i - 1];
+        var speed = clampNum(BASE_SPEED - slope * SLOPE_FACTOR, MIN_SPEED, MAX_SPEED);
+        times.push(times[i - 1] + 1 / speed);
+      }
+      return times;
+    }
+    function getRideProgress(timeline, elapsedSec) {
+      var n = timeline.length;
+      if (elapsedSec >= timeline[n - 1]) return { done: true, col: n - 1, nextCol: n - 1, frac: 1 };
+      var i = 0;
+      while (i < n - 2 && timeline[i + 1] <= elapsedSec) i++;
+      var segStart = timeline[i], segEnd = timeline[i + 1];
+      var frac = segEnd > segStart ? (elapsedSec - segStart) / (segEnd - segStart) : 0;
+      return { done: false, col: i, nextCol: i + 1, frac: frac };
+    }
+
+    // ---------------- ride rendering ----------------
+    var WORLD_STEP = 60, UNIT_PX = 22, GROUND_Y = 230, CANVAS_W = 480, CANVAS_H = 270;
+    var rideCtx = null;
+    var rideAnimId = null;
+    var rideHeights = null, rideFallback = null, rideTimeline = null;
+    var rideStartPerf = 0; // performance.now() reference corresponding to elapsedSec=0
+    var rideCrashed = false, crashFallVel = 0, crashWorldX = 0, crashWorldY = 0, crashStartPerf = 0;
+    var rideFinished = false;
+
+    function worldX(col) { return col * WORLD_STEP; }
+    function worldY(h) { return GROUND_Y - h * UNIT_PX; }
+
+    function initRideCanvas() {
+      var canvas = document.getElementById("rideCanvas");
+      canvas.width = CANVAS_W; canvas.height = CANVAS_H;
+      rideCtx = canvas.getContext("2d");
+    }
+    // startAtElapsedSec: if >0, the ride is joined mid-flight (e.g. a guest whose subscription/join
+    // landed slightly after the host's start signal) — the timeline math above means jumping straight
+    // to that offset still lands in exactly the right place.
+    function beginRide(heights, startAtElapsedSec) {
+      if (!rideCtx) initRideCanvas();
+      rideHeights = heights;
+      rideFallback = fallbackHeights(heights);
+      rideTimeline = buildRideTimeline(rideFallback);
+      rideCrashed = false; rideFinished = false;
+      rideStartPerf = performance.now() - Math.max(0, startAtElapsedSec || 0) * 1000;
+      document.getElementById("rideOverlay").classList.remove("show");
+      showScreen("screen-ride");
+      if (rideAnimId) cancelAnimationFrame(rideAnimId);
+      rideAnimId = requestAnimationFrame(rideFrame);
+    }
+    function rideFrame() {
+      var elapsed = (performance.now() - rideStartPerf) / 1000;
+      var ctx = rideCtx;
+      ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+      var skyGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+      skyGrad.addColorStop(0, "#3fa9d9"); skyGrad.addColorStop(1, "#bfe8ff");
+      ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+      var prog = getRideProgress(rideTimeline, Math.min(elapsed, rideTimeline[rideTimeline.length - 1]));
+      var cartWX, cartWY, isOverGap, slopeAngle = 0;
+
+      if (!rideCrashed) {
+        cartWX = worldX(prog.col) + (worldX(prog.nextCol) - worldX(prog.col)) * prog.frac;
+        cartWY = worldY(rideFallback[prog.col]) + (worldY(rideFallback[prog.nextCol]) - worldY(rideFallback[prog.col])) * prog.frac;
+        slopeAngle = Math.atan2(worldY(rideFallback[prog.nextCol]) - worldY(rideFallback[prog.col]), WORLD_STEP);
+        isOverGap = (rideHeights[prog.col] == null) || (rideHeights[prog.nextCol] == null && prog.frac > 0.3);
+        if (isOverGap && !prog.done) {
+          rideCrashed = true; crashStartPerf = performance.now();
+          crashWorldX = cartWX; crashWorldY = cartWY; crashFallVel = 0;
+          playCrashSound();
+        } else if (prog.done) {
+          rideFinished = true;
+        }
+      }
+      var fallDt = 0;
+      if (rideCrashed) {
+        fallDt = (performance.now() - crashStartPerf) / 1000;
+        crashFallVel += 900 * Math.min(fallDt, 0.05); // rough gravity feel, clamp dt spikes
+        crashWorldY += crashFallVel * 0.016;
+        crashWorldX += 40 * 0.016;
+        cartWX = crashWorldX; cartWY = crashWorldY;
+        slopeAngle = Math.min(1.8, fallDt * 3);
+      }
+
+      var cameraX = rideCrashed ? (crashWorldX - CANVAS_W / 2) : (cartWX - CANVAS_W / 2);
+      cameraX = clampNum(cameraX, 0, Math.max(0, worldX(TRACK_COLS - 1) - CANVAS_W + WORLD_STEP));
+
+      // track
+      ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.strokeStyle = "#3a2a5e";
+      for (var i = 0; i < rideHeights.length - 1; i++) {
+        if (rideHeights[i] == null || rideHeights[i + 1] == null) continue;
+        ctx.beginPath();
+        ctx.moveTo(worldX(i) - cameraX, worldY(rideHeights[i]));
+        ctx.lineTo(worldX(i + 1) - cameraX, worldY(rideHeights[i + 1]));
+        ctx.stroke();
+        ctx.strokeStyle = "#ffd76b"; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(worldX(i) - cameraX, worldY(rideHeights[i]) - 4);
+        ctx.lineTo(worldX(i + 1) - cameraX, worldY(rideHeights[i + 1]) - 4);
+        ctx.stroke();
+        ctx.strokeStyle = "#3a2a5e"; ctx.lineWidth = 6;
+      }
+      // ground
+      ctx.fillStyle = "#2b8a3e";
+      ctx.fillRect(0, GROUND_Y + 4, CANVAS_W, CANVAS_H - GROUND_Y - 4);
+
+      // cart
+      var cx = cartWX - cameraX, cy = cartWY;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(slopeAngle);
+      ctx.fillStyle = "#ff5f5f";
+      ctx.fillRect(-16, -14, 32, 16);
+      ctx.fillStyle = "#333";
+      ctx.beginPath(); ctx.arc(-9, 4, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(9, 4, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.font = "16px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("😃", 0, -16);
+      ctx.restore();
+
+      // progress bar
+      var pct = rideCrashed ? (worldX(prog.col) / worldX(TRACK_COLS - 1)) * 100 : Math.min(100, (cartWX / worldX(TRACK_COLS - 1)) * 100);
+      document.getElementById("progressBarFill").style.width = clampNum(pct, 0, 100) + "%";
+
+      if (rideCrashed && fallDt > 1.5) {
+        showRideEnd(false);
+        return;
+      }
+      if (rideFinished) {
+        showRideEnd(true);
+        return;
+      }
+      rideAnimId = requestAnimationFrame(rideFrame);
+    }
+    function showRideEnd(success) {
+      cancelAnimationFrame(rideAnimId);
+      var overlay = document.getElementById("rideOverlay");
+      var msg = document.getElementById("rideOverlayMsg");
+      if (success) {
+        msg.textContent = "🎉 You made it! 🎡";
+        playCelebrateSound();
+      } else {
+        msg.textContent = "💥 Uh oh! There was a gap in the track!";
+      }
+      overlay.classList.add("show");
+    }
+
+    // ---------------- builder ----------------
+    var builderHeights = newFlatTrack();
+    var builderCtx = null;
+    var builderMode = "draw"; // "draw" | "erase"
+    function initBuilderCanvas() {
+      var canvas = document.getElementById("builderCanvas");
+      canvas.width = TRACK_COLS * 20; canvas.height = (MAX_HEIGHT + 2) * 24;
+      builderCtx = canvas.getContext("2d");
+    }
+    function renderBuilder() {
+      var canvas = document.getElementById("builderCanvas");
+      var ctx = builderCtx;
+      var colW = canvas.width / TRACK_COLS;
+      var unitH = 24;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#12163a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      for (var i = 0; i < TRACK_COLS; i++) {
+        var h = builderHeights[i];
+        var x = i * colW;
+        if (h == null) {
+          ctx.fillStyle = "rgba(255,95,95,0.25)";
+          ctx.fillRect(x, canvas.height - unitH, colW - 2, unitH);
+          continue;
+        }
+        var barH = h * unitH;
+        ctx.fillStyle = "#ffd76b";
+        ctx.fillRect(x, canvas.height - barH, colW - 2, barH);
+      }
+    }
+    function setColumnFromPointer(e, canvas) {
+      var rect = canvas.getBoundingClientRect();
+      var scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+      var px = (e.clientX - rect.left) * scaleX, py = (e.clientY - rect.top) * scaleY;
+      var colW = canvas.width / TRACK_COLS;
+      var col = clampNum(Math.floor(px / colW), 0, TRACK_COLS - 1);
+      if (builderMode === "erase") {
+        builderHeights[col] = null;
+      } else {
+        var unitH = 24;
+        var h = Math.round((canvas.height - py) / unitH);
+        builderHeights[col] = clampNum(h, MIN_HEIGHT, MAX_HEIGHT);
+      }
+      renderBuilder();
+    }
+    function openBuilder() {
+      builderHeights = loadMyTrack() || newFlatTrack();
+      builderMode = "draw";
+      if (!builderCtx) initBuilderCanvas();
+      renderBuilder();
+      renderModeButtons();
+      showScreen("screen-builder");
+    }
+    function renderModeButtons() {
+      document.getElementById("modeEraseBtn").className = "btn" + (builderMode === "erase" ? " danger" : "");
+      document.getElementById("modeDrawBtn").style.opacity = builderMode === "draw" ? "1" : "0.7";
+    }
+
+    // ---------------- live rooms (Supabase) ----------------
+    var currentRoomCode = null;
+    var currentRoomChannel = null;
+    var isHostOfRoom = false;
+    var joinedMembers = [];
+
+    function randomRoomCode() {
+      var letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I/O to avoid look-alike confusion
+      var s = "";
+      for (var i = 0; i < 4; i++) s += letters[Math.floor(Math.random() * letters.length)];
+      return s;
+    }
+    function teardownRoomChannel() {
+      if (currentRoomChannel) { sb.removeChannel(currentRoomChannel); currentRoomChannel = null; }
+    }
+    async function hostLiveRoom(heights) {
+      var code = randomRoomCode();
+      var attempts = 0;
+      while (attempts < 3) {
+        var res = await sb.from("rooms").insert({ code: code, track: heights }).select();
+        if (!res.error) break;
+        code = randomRoomCode();
+        attempts++;
+      }
+      currentRoomCode = code;
+      isHostOfRoom = true;
+      joinedMembers = [];
+      document.getElementById("hostCodeDisplay").textContent = code;
+      renderMemberChips();
+      subscribeToRoom(code);
+      showScreen("screen-hostLobby");
+    }
+    function renderMemberChips() {
+      [document.getElementById("memberListHost"), document.getElementById("memberListGuest")].forEach(function (list) {
+        if (!list) return;
+        list.innerHTML = "";
+        joinedMembers.forEach(function (name) {
+          var chip = document.createElement("div");
+          chip.className = "memberChip";
+          chip.textContent = "🙂 " + name;
+          list.appendChild(chip);
+        });
+        if (joinedMembers.length === 0) {
+          var none = document.createElement("div");
+          none.style.opacity = "0.7"; none.style.fontSize = "0.85rem";
+          none.textContent = "No one has joined yet...";
+          list.appendChild(none);
+        }
+      });
+    }
+    function subscribeToRoom(code) {
+      teardownRoomChannel();
+      currentRoomChannel = sb.channel("room-" + code)
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms", filter: "code=eq." + code }, function (payload) {
+          var row = payload.new;
+          if (row.ride_started_at) {
+            var startedAtMs = new Date(row.ride_started_at).getTime();
+            var elapsedSec = (Date.now() - startedAtMs) / 1000;
+            beginRide(row.track, elapsedSec);
+          }
+        })
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "room_members", filter: "code=eq." + code }, function (payload) {
+          joinedMembers.push(payload.new.name);
+          renderMemberChips();
+        })
+        .subscribe();
+    }
+    async function joinLiveRoom(code, name) {
+      var statusEl = document.getElementById("joinStatus");
+      statusEl.textContent = "Looking for that coaster...";
+      var res = await sb.from("rooms").select("*").eq("code", code).maybeSingle();
+      if (res.error || !res.data) {
+        statusEl.textContent = "😅 Couldn't find that code. Double check it!";
+        return;
+      }
+      currentRoomCode = code;
+      isHostOfRoom = false;
+      var membersRes = await sb.from("room_members").select("name").eq("code", code);
+      joinedMembers = (membersRes.data || []).map(function (m) { return m.name; });
+      await sb.from("room_members").insert({ code: code, name: name });
+      if (joinedMembers.indexOf(name) === -1) joinedMembers.push(name);
+      renderMemberChips();
+      subscribeToRoom(code);
+      statusEl.textContent = "";
+      showScreen("screen-guestWait");
+      // in case the host already started before we subscribed
+      var freshRoom = await sb.from("rooms").select("*").eq("code", code).maybeSingle();
+      if (freshRoom.data && freshRoom.data.ride_started_at) {
+        var startedAtMs = new Date(freshRoom.data.ride_started_at).getTime();
+        beginRide(freshRoom.data.track, (Date.now() - startedAtMs) / 1000);
+      }
+    }
+    async function startHostedRide() {
+      if (!currentRoomCode) return;
+      await sb.from("rooms").update({ ride_started_at: new Date().toISOString() }).eq("code", currentRoomCode);
+    }
+    function leaveRoom() {
+      teardownRoomChannel();
+      currentRoomCode = null;
+      isHostOfRoom = false;
+      joinedMembers = [];
+    }
+
+    // ---------------- food court ----------------
+    var FOOD_ITEMS = [
+      { emo: "🍕", name: "Pizza", reactions: ["Yum, pizza! 🍕", "So cheesy and good!", "Best slice ever!"] },
+      { emo: "🍔", name: "Burger", reactions: ["Mmm, burger time! 🍔", "So juicy!", "Great choice!"] },
+      { emo: "🌭", name: "Hot Dog", reactions: ["Classic hot dog! 🌭", "Ketchup or mustard?", "Yum!"] },
+      { emo: "🍦", name: "Ice Cream", reactions: ["Cool and sweet! 🍦", "Brain freeze incoming!", "So creamy!"] },
+      { emo: "🍩", name: "Donut", reactions: ["Sprinkles galore! 🍩", "Sweet treat!", "So fluffy!"] },
+      { emo: "🥤", name: "Soda", reactions: ["Fizzy and refreshing! 🥤", "Bubbly!", "Thirst = quenched!"] },
+    ];
+    var foodOrderCount = 0;
+    function renderFoodGrid() {
+      var grid = document.getElementById("foodGrid");
+      grid.innerHTML = "";
+      FOOD_ITEMS.forEach(function (item) {
+        var b = document.createElement("button");
+        b.className = "foodBtn";
+        b.textContent = item.emo;
+        b.addEventListener("click", function () {
+          playYumSound();
+          var line = item.reactions[Math.floor(Math.random() * item.reactions.length)];
+          document.getElementById("foodReaction").textContent = line;
+          foodOrderCount++;
+          document.getElementById("foodCount").textContent = "You've tried " + foodOrderCount + " thing" + (foodOrderCount === 1 ? "" : "s") + " today!";
+        });
+        grid.appendChild(b);
+      });
+    }
+
+    // ---------------- wiring ----------------
+    document.getElementById("homeBuildBtn").addEventListener("click", function () { playClickSound(); openBuilder(); });
+    document.getElementById("homeComputerBtn").addEventListener("click", function () {
+      playClickSound();
+      var list = document.getElementById("templateList");
+      list.innerHTML = "";
+      COMPUTER_COASTERS.forEach(function (t) {
+        var card = document.createElement("div");
+        card.className = "templateCard";
+        card.innerHTML = '<span class="emo">' + t.emoji + '</span><span class="name">' + t.name + '</span>';
+        card.addEventListener("click", function () { beginRide(t.heights, 0); });
+        list.appendChild(card);
+      });
+      showScreen("screen-templates");
+    });
+    document.getElementById("templatesCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
+    document.getElementById("homeMineBtn").addEventListener("click", function () {
+      var track = loadMyTrack();
+      if (!track) { openBuilder(); return; }
+      beginRide(track, 0);
+    });
+    document.getElementById("homeJoinBtn").addEventListener("click", function () {
+      document.getElementById("joinNameInput").value = "";
+      document.getElementById("codeInput").value = "";
+      document.getElementById("joinStatus").textContent = "";
+      showScreen("screen-join");
+    });
+    document.getElementById("homeFoodBtn").addEventListener("click", function () {
+      renderFoodGrid();
+      document.getElementById("foodReaction").textContent = "";
+      document.getElementById("foodCount").textContent = foodOrderCount > 0 ? ("You've tried " + foodOrderCount + " things today!") : "";
+      showScreen("screen-food");
+    });
+    document.getElementById("foodBackBtn").addEventListener("click", function () { showScreen("screen-home"); });
+
+    document.getElementById("builderCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
+    document.getElementById("builderSaveBtn").addEventListener("click", function () {
+      saveMyTrack(builderHeights);
+      showScreen("screen-saved");
+    });
+    document.getElementById("modeDrawBtn").addEventListener("click", function () { builderMode = "draw"; renderModeButtons(); });
+    document.getElementById("modeEraseBtn").addEventListener("click", function () { builderMode = "erase"; renderModeButtons(); });
+    (function () {
+      var canvas = document.getElementById("builderCanvas");
+      var dragging = false;
+      canvas.addEventListener("pointerdown", function (e) { e.preventDefault(); dragging = true; setColumnFromPointer(e, canvas); if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId); });
+      canvas.addEventListener("pointermove", function (e) { if (!dragging) return; setColumnFromPointer(e, canvas); });
+      canvas.addEventListener("pointerup", function () { dragging = false; });
+      canvas.addEventListener("pointerleave", function () { dragging = false; });
+    })();
+
+    document.getElementById("savedRideBtn").addEventListener("click", function () { beginRide(loadMyTrack(), 0); });
+    document.getElementById("savedHostBtn").addEventListener("click", function () { hostLiveRoom(loadMyTrack()); });
+    document.getElementById("savedHomeBtn").addEventListener("click", function () { showScreen("screen-home"); });
+
+    document.getElementById("joinCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
+    document.getElementById("joinGoBtn").addEventListener("click", function () {
+      var name = document.getElementById("joinNameInput").value.trim() || "Friend";
+      var code = document.getElementById("codeInput").value.trim().toUpperCase();
+      if (!code) { document.getElementById("joinStatus").textContent = "Type a code first!"; return; }
+      joinLiveRoom(code, name);
+    });
+    document.getElementById("hostStartBtn").addEventListener("click", function () { playWhooshUp(); startHostedRide(); });
+    document.getElementById("hostCancelBtn").addEventListener("click", function () { leaveRoom(); showScreen("screen-home"); });
+    document.getElementById("guestCancelBtn").addEventListener("click", function () { leaveRoom(); showScreen("screen-home"); });
+
+    document.getElementById("rideRetryBtn").addEventListener("click", function () {
+      document.getElementById("rideOverlay").classList.remove("show");
+      beginRide(rideHeights, 0);
+    });
+    document.getElementById("rideHomeBtn").addEventListener("click", function () {
+      document.getElementById("rideOverlay").classList.remove("show");
+      leaveRoom();
+      showScreen("screen-home");
+    });
+  </script>
+</body>
+</html>
