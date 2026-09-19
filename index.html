@@ -263,7 +263,8 @@
       <canvas id="parkCanvas"></canvas>
       <div id="parkArrival"></div>
     </div>
-    <div style="font-size:0.75rem; opacity:0.8; margin-top:6px;">Tap anywhere on the map to walk there!</div>
+    <div style="font-size:0.75rem; opacity:0.8; margin: 6px 0;">Tap anywhere on the map to walk there!</div>
+    <button class="btn wide" id="parkBuildBtn">🛠️ Build a Coaster Here</button>
   </div>
 
   <!-- ==================== NAME + COLOR SETUP ==================== -->
@@ -585,8 +586,11 @@
       }
       renderBuilder();
     }
-    function openBuilder() {
-      builderHeights = loadMyTrack() || newFlatTrack();
+    var builderReturnTo = "screen-home";
+    var pendingBuildX = null, pendingBuildY = null;
+    function openBuilder(startFresh) {
+      builderHeights = startFresh ? newFlatTrack() : (loadMyTrack() || newFlatTrack());
+      if (startFresh) document.getElementById("coasterNameInput").value = "";
       builderMode = "draw";
       if (!builderCtx) initBuilderCanvas();
       renderBuilder();
@@ -934,12 +938,22 @@
       { id: "food3", name: "Sweet Treats Food Court", emoji: "🍦", x: 780, y: 430, type: "fun", funSet: "food3" },
     ];
     function coasterPinFor(coaster, idx) {
+      // If the kid picked a spot in the park before building, ride it right there; coasters built
+      // from the Home screen (no chosen spot) fall back to an auto-arranged grid.
+      if (coaster.x != null && coaster.y != null) {
+        return { id: "coaster_" + coaster.id, name: coaster.name, emoji: "🎢", x: coaster.x, y: coaster.y, type: "coaster", coaster: coaster };
+      }
       var perRow = 6;
       var col = idx % perRow, row = Math.floor(idx / perRow);
       return { id: "coaster_" + coaster.id, name: coaster.name, emoji: "🎢", x: 80 + col * 140, y: 190 + row * 70, type: "coaster", coaster: coaster };
     }
+    var COMPUTER_COASTER_XS = [150, 350, 550, 750];
+    function computerCoasterPinFor(c, idx) {
+      return { id: "cc_" + c.id, name: c.name, emoji: c.emoji, x: COMPUTER_COASTER_XS[idx % COMPUTER_COASTER_XS.length], y: 130, type: "computerCoaster", coaster: c };
+    }
     function allPins() {
       var pins = PARK_PLACES.slice();
+      COMPUTER_COASTERS.forEach(function (c, i) { pins.push(computerCoasterPinFor(c, i)); });
       parkCoasters.forEach(function (c, i) { pins.push(coasterPinFor(c, i)); });
       return pins;
     }
@@ -1058,6 +1072,12 @@
         btn.textContent = "🎫 Ride This Coaster!";
         btn.addEventListener("click", function () { rideCoasterTogether(pin.coaster); });
         box.appendChild(btn);
+      } else if (pin.type === "computerCoaster") {
+        var btn3 = document.createElement("button");
+        btn3.className = "btn small";
+        btn3.textContent = "🎫 Ride It!";
+        btn3.addEventListener("click", function () { beginRide(pin.coaster.heights, 0, pin.coaster.name); });
+        box.appendChild(btn3);
       } else if (pin.type === "fun") {
         var btn2 = document.createElement("button");
         btn2.className = "btn small";
@@ -1203,7 +1223,11 @@
     }
 
     // ---------------- wiring ----------------
-    document.getElementById("homeBuildBtn").addEventListener("click", function () { playClickSound(); openBuilder(); });
+    document.getElementById("homeBuildBtn").addEventListener("click", function () {
+      playClickSound();
+      builderReturnTo = "screen-home";
+      openBuilder(false);
+    });
     document.getElementById("homeComputerBtn").addEventListener("click", function () {
       playClickSound();
       var list = document.getElementById("templateList");
@@ -1220,7 +1244,7 @@
     document.getElementById("templatesCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
     document.getElementById("homeMineBtn").addEventListener("click", function () {
       var track = loadMyTrack();
-      if (!track) { openBuilder(); return; }
+      if (!track) { builderReturnTo = "screen-home"; openBuilder(false); return; }
       beginRide(track, 0, window.localStorage.getItem("coasterPartyMyTrackName") || "My Coaster");
     });
     document.getElementById("homeJoinBtn").addEventListener("click", function () {
@@ -1234,6 +1258,13 @@
 
     document.getElementById("homeParkBtn").addEventListener("click", function () { enterPark(); });
     document.getElementById("parkBackBtn").addEventListener("click", function () { leavePark(); });
+    document.getElementById("parkBuildBtn").addEventListener("click", function () {
+      if (!myName) { openIdentityOverlay(function () { document.getElementById("parkBuildBtn").click(); }); return; }
+      pendingBuildX = myWorldX; pendingBuildY = myWorldY;
+      builderReturnTo = "screen-park";
+      if (parkAnimId) cancelAnimationFrame(parkAnimId);
+      openBuilder(true);
+    });
     document.getElementById("searchGoBtn").addEventListener("click", searchPark);
     document.getElementById("searchInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); searchPark(); } });
     (function () {
@@ -1271,15 +1302,26 @@
     document.getElementById("chatSendBtn").addEventListener("click", sendChatMessage);
     document.getElementById("chatInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); sendChatMessage(); } });
 
-    document.getElementById("builderCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
+    document.getElementById("builderCancelBtn").addEventListener("click", function () {
+      pendingBuildX = null; pendingBuildY = null;
+      showScreen(builderReturnTo);
+    });
     document.getElementById("builderSaveBtn").addEventListener("click", async function () {
       var name = document.getElementById("coasterNameInput").value.trim() || "My Awesome Coaster";
       saveMyTrack(builderHeights);
       window.localStorage.setItem("coasterPartyMyTrackName", name);
       var builderName = myName || "A Kid";
-      var res = await sb.from("coasters").insert({ name: name, heights: builderHeights, builder_name: builderName }).select();
+      var row = { name: name, heights: builderHeights, builder_name: builderName };
+      if (pendingBuildX != null && pendingBuildY != null) { row.x = pendingBuildX; row.y = pendingBuildY; }
+      var res = await sb.from("coasters").insert(row).select();
       if (res.data && res.data[0]) parkCoasters.push(res.data[0]);
-      showScreen("screen-saved");
+      var builtInPark = builderReturnTo === "screen-park";
+      pendingBuildX = null; pendingBuildY = null;
+      if (builtInPark) {
+        enterPark(); // straight back to the park so the new coaster's pin shows up right where you built it
+      } else {
+        showScreen("screen-saved");
+      }
     });
     document.getElementById("modeDrawBtn").addEventListener("click", function () { builderMode = "draw"; renderModeButtons(); });
     document.getElementById("modeEraseBtn").addEventListener("click", function () { builderMode = "erase"; renderModeButtons(); });
