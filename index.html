@@ -465,6 +465,16 @@
     function noLoops(len) { return new Array(len || TRACK_COLS).fill(false); }
     function loopsAt(idxs) { var a = noLoops(); idxs.forEach(function (i) { a[i] = true; }); return a; }
     var COMPUTER_COASTERS = [
+      // These three are built to evoke real Lagoon coasters' signature moments — Cannibal's
+      // beyond-vertical launch drop, Wicked's twisting dive off the lift, Colossus's long classic
+      // wooden-coaster profile — not a literal survey-accurate trace, just a genuine best effort at
+      // the real shape and feel within what a simple height-per-column track can represent.
+      { id: "cannibal", name: "Cannibal", emoji: "👹", loops: noLoops(),
+        heights: [2,3,20,20,2,4,14,3,11,3,9,3,7,3,5,3,4,3,3,2,2,2,2,2] },
+      { id: "wicked", name: "Wicked", emoji: "😈", loops: loopsAt([5]),
+        heights: [2,5,20,18,4,12,4,10,3,8,3,6,3,5,3,4,3,3,2,2,2,2,2,2] },
+      { id: "colossus", name: "Colossus: The Fire Dragon", emoji: "🐉", loops: noLoops(32),
+        heights: [2,4,8,14,18,20,19,8,16,6,14,5,12,5,10,5,9,4,8,4,7,4,6,3,5,3,4,3,3,2,2,2] },
       { id: "wavy", name: "Wavy Wonder", emoji: "🌊", loops: noLoops(),
         heights: [4,5,6,7,6,5,4,3,2,3,4,5,6,7,6,5,4,3,2,3,4,5,6,4] },
       { id: "mountain", name: "Mountain Madness", emoji: "🏔️", loops: noLoops(),
@@ -1170,10 +1180,11 @@
     // ---------------- the big park map: places, coasters, avatars, NPCs, search ----------------
     var WORLD_W = 900, WORLD_H = 640;
     var PARK_PLACES = [
-      { id: "scallywags", name: "Scallywags", emoji: "🏴‍☠️", x: 90, y: 70, type: "ride" },
-      { id: "scrambler", name: "Space Scrambler", emoji: "🚀", x: 330, y: 60, type: "ride" },
-      { id: "ferris", name: "Ferris Wheel", emoji: "🎡", x: 590, y: 70, type: "ride" },
-      { id: "screamer", name: "Centennial Screamer", emoji: "😱", x: 820, y: 60, type: "ride" },
+      { id: "scallywags", name: "Scallywags", emoji: "🏴‍☠️", x: 70, y: 70, type: "ride" },
+      { id: "scrambler", name: "Space Scrambler", emoji: "🚀", x: 250, y: 60, type: "ride" },
+      { id: "ferris", name: "Ferris Wheel", emoji: "🎡", x: 430, y: 70, type: "ride" },
+      { id: "screamer", name: "Centennial Screamer", emoji: "😱", x: 610, y: 60, type: "ride" },
+      { id: "spider", name: "Spider", emoji: "🕷️", x: 790, y: 70, type: "ride" }, // a real Lagoon flat/spinning ride, not a coaster — belongs here, not in COMPUTER_COASTERS
       { id: "arcade", name: "Arcade", emoji: "🕹️", x: 180, y: 430, type: "fun", funSet: "arcade" },
       { id: "bowling", name: "Bowling", emoji: "🎳", x: 420, y: 430, type: "fun", funSet: "bowling" },
       { id: "skiball", name: "Ski Ball", emoji: "🎯", x: 660, y: 430, type: "fun", funSet: "skiball" },
