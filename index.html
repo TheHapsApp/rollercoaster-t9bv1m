@@ -72,7 +72,7 @@
   #memberList { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 320px; }
   .memberChip { background: rgba(255,255,255,0.16); border: 2px solid #fff; border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; font-weight: bold; }
 
-  #templateList { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  #templateList, #myCoastersList { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
   .templateCard {
     display: flex; align-items: center; gap: 10px; text-align: left;
     background: rgba(255,255,255,0.12); border: 3px solid #fff; border-radius: 16px; padding: 10px 14px; cursor: pointer;
@@ -209,6 +209,17 @@
     <div id="templateList"></div>
   </div>
 
+  <!-- ==================== YOUR COASTERS (you can build as many as you want) ==================== -->
+  <div class="screen" id="screen-mycoasters">
+    <div class="topBar">
+      <button class="btn" id="myCoastersCancelBtn">✖ Back</button>
+      <div class="title">🎫 Your Coasters</div>
+      <button class="btn small" id="myCoastersBuildNewBtn">➕ New</button>
+    </div>
+    <div id="myCoastersList"></div>
+    <div id="myCoastersEmpty" style="display:none; opacity:0.85; margin-top:30px; font-size:0.9rem;">You haven't built a coaster yet! Tap "➕ New" above to make your first one. 🎢</div>
+  </div>
+
   <!-- ==================== JOIN ==================== -->
   <div class="screen" id="screen-join">
     <div class="topBar">
@@ -330,8 +341,9 @@
     var ADD_TRACK_CHUNK = 8; // how many columns "Add More Track" appends at a time
     var MAX_TRACK_COLS = 200; // a practical ceiling (not a creative one) so a track can't grow into something the phone can't render/scroll
     var MIN_HEIGHT = 1, MAX_HEIGHT = 20, DEFAULT_HEIGHT = 3;
-    var MY_TRACK_KEY = "coasterPartyMyTrack";
+    var MY_TRACK_KEY = "coasterPartyMyTrack"; // legacy single-slot keys — read only, for one-time migration
     var MY_TRACK_LOOPS_KEY = "coasterPartyMyTrackLoops";
+    var MY_COASTERS_KEY = "coasterPartyMyCoasters"; // array of { id, name, heights, loops } — you can build as many as you want now
 
     // ---------------- procedural sound (Web Audio, no audio files) ----------------
     var audioCtx = null;
@@ -376,16 +388,15 @@
       for (var i = 0; i < TRACK_COLS; i++) arr.push(DEFAULT_HEIGHT);
       return arr;
     }
+    // Legacy single-slot readers — only used by migrateOldSingleTrack() below, to fold a kid's one
+    // previously-saved coaster into the new list the first time they open it after this update.
     function loadMyTrack() {
       try {
         var raw = window.localStorage.getItem(MY_TRACK_KEY);
         var parsed = raw ? JSON.parse(raw) : null;
-        if (Array.isArray(parsed) && parsed.length >= 2) return parsed; // any length now — tracks can be longer or shorter than the old fixed 24
+        if (Array.isArray(parsed) && parsed.length >= 2) return parsed;
       } catch (e) {}
       return null;
-    }
-    function saveMyTrack(heights) {
-      try { window.localStorage.setItem(MY_TRACK_KEY, JSON.stringify(heights)); } catch (e) {}
     }
     function loadMyTrackLoops() {
       try {
@@ -395,8 +406,32 @@
       } catch (e) {}
       return null;
     }
-    function saveMyTrackLoops(loops) {
-      try { window.localStorage.setItem(MY_TRACK_LOOPS_KEY, JSON.stringify(loops)); } catch (e) {}
+    function loadMyCoasters() {
+      try {
+        var raw = window.localStorage.getItem(MY_COASTERS_KEY);
+        var parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+      return [];
+    }
+    function saveMyCoastersList(list) {
+      try { window.localStorage.setItem(MY_COASTERS_KEY, JSON.stringify(list)); } catch (e) {}
+    }
+    function addMyCoaster(coaster) {
+      var list = loadMyCoasters();
+      list.push({ id: coaster.id, name: coaster.name, heights: coaster.heights, loops: coaster.loops });
+      saveMyCoastersList(list);
+    }
+    // One-time upgrade: before this update, a kid could only have ONE coaster locally (each new
+    // save overwrote it). If that old single slot still has something in it and the new list is
+    // still empty, carry it over so it shows up in "Your Coasters" instead of silently vanishing.
+    function migrateOldSingleTrack() {
+      if (loadMyCoasters().length > 0) return;
+      var oldHeights = loadMyTrack();
+      if (!oldHeights) return;
+      var oldName = window.localStorage.getItem("coasterPartyMyTrackName") || "My Coaster";
+      var oldLoops = loadMyTrackLoops() || noLoops(oldHeights.length);
+      addMyCoaster({ id: "local_" + Date.now(), name: oldName, heights: oldHeights, loops: oldLoops });
     }
     // For pacing/visual interpolation only — fills gaps with the nearest real track height so the
     // approach to a gap still looks like a continuous hill right up to the edge. Crash detection
@@ -706,10 +741,13 @@
     }
     var builderReturnTo = "screen-home";
     var pendingBuildX = null, pendingBuildY = null;
-    function openBuilder(startFresh) {
-      builderHeights = startFresh ? newFlatTrack() : (loadMyTrack() || newFlatTrack());
-      builderLoops = startFresh ? noLoops(builderHeights.length) : (loadMyTrackLoops() || noLoops(builderHeights.length));
-      if (startFresh) document.getElementById("coasterNameInput").value = "";
+    var lastSavedCoaster = null; // whichever coaster was JUST built — screen-saved's buttons act on this one specifically
+    // Every visit to the builder starts a brand new blank coaster now — since you can build as many
+    // as you want, there's no single "the" coaster to resume/overwrite anymore (see addMyCoaster).
+    function openBuilder() {
+      builderHeights = newFlatTrack();
+      builderLoops = noLoops(builderHeights.length);
+      document.getElementById("coasterNameInput").value = "";
       builderMode = "draw";
       if (!builderCtx) initBuilderCanvas();
       renderBuilder();
@@ -1357,6 +1395,36 @@
       parkAnimId = requestAnimationFrame(parkFrame);
     }
 
+    // ---------------- "Your Coasters" — every coaster THIS kid has built, tap to ride, ---------------
+    // ---------------- little 👥 button to host a live ride for that specific one -------------------
+    function renderMyCoastersList() {
+      var list = document.getElementById("myCoastersList");
+      list.innerHTML = "";
+      var mine = loadMyCoasters();
+      document.getElementById("myCoastersEmpty").style.display = mine.length === 0 ? "block" : "none";
+      mine.forEach(function (c) {
+        var card = document.createElement("div");
+        card.className = "templateCard";
+        var info = document.createElement("div");
+        info.style.flex = "1"; info.style.display = "flex"; info.style.alignItems = "center"; info.style.gap = "10px"; info.style.cursor = "pointer";
+        info.innerHTML = '<span class="emo">🎢</span><span class="name">' + c.name + '</span>';
+        info.addEventListener("click", function () { beginRide(c.heights, 0, c.name, c.loops); });
+        card.appendChild(info);
+        var hostBtn = document.createElement("button");
+        hostBtn.className = "btn small";
+        hostBtn.textContent = "👥";
+        hostBtn.title = "Host a live ride";
+        hostBtn.addEventListener("click", function (e) { e.stopPropagation(); hostLiveRoom(c.heights, c.name, c.loops); });
+        card.appendChild(hostBtn);
+        list.appendChild(card);
+      });
+    }
+    function openMyCoasters() {
+      migrateOldSingleTrack();
+      renderMyCoastersList();
+      showScreen("screen-mycoasters");
+    }
+
     // ---------------- ride a built coaster together, found via the park map ----------------
     var roomLaunchedFromPark = false;
     async function rideCoasterTogether(coaster) {
@@ -1381,7 +1449,7 @@
     document.getElementById("homeBuildBtn").addEventListener("click", function () {
       playClickSound();
       builderReturnTo = "screen-home";
-      openBuilder(false);
+      openBuilder();
     });
     document.getElementById("homeComputerBtn").addEventListener("click", function () {
       playClickSound();
@@ -1397,10 +1465,12 @@
       showScreen("screen-templates");
     });
     document.getElementById("templatesCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
-    document.getElementById("homeMineBtn").addEventListener("click", function () {
-      var track = loadMyTrack();
-      if (!track) { builderReturnTo = "screen-home"; openBuilder(false); return; }
-      beginRide(track, 0, window.localStorage.getItem("coasterPartyMyTrackName") || "My Coaster", loadMyTrackLoops());
+    document.getElementById("homeMineBtn").addEventListener("click", function () { openMyCoasters(); });
+    document.getElementById("myCoastersCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
+    document.getElementById("myCoastersBuildNewBtn").addEventListener("click", function () {
+      playClickSound();
+      builderReturnTo = "screen-home";
+      openBuilder();
     });
     document.getElementById("homeJoinBtn").addEventListener("click", function () {
       document.getElementById("joinNameInput").value = "";
@@ -1418,7 +1488,7 @@
       pendingBuildX = myWorldX; pendingBuildY = myWorldY;
       builderReturnTo = "screen-park";
       if (parkAnimId) cancelAnimationFrame(parkAnimId);
-      openBuilder(true);
+      openBuilder();
     });
     document.getElementById("searchGoBtn").addEventListener("click", searchPark);
     document.getElementById("searchInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); searchPark(); } });
@@ -1463,14 +1533,14 @@
     });
     document.getElementById("builderSaveBtn").addEventListener("click", async function () {
       var name = document.getElementById("coasterNameInput").value.trim() || "My Awesome Coaster";
-      saveMyTrack(builderHeights);
-      saveMyTrackLoops(builderLoops);
-      window.localStorage.setItem("coasterPartyMyTrackName", name);
       var builderName = myName || "A Kid";
       var row = { name: name, heights: builderHeights, loops: builderLoops, builder_name: builderName };
       if (pendingBuildX != null && pendingBuildY != null) { row.x = pendingBuildX; row.y = pendingBuildY; }
       var res = await sb.from("coasters").insert(row).select();
+      var savedRow = (res.data && res.data[0]) || Object.assign({ id: "local_" + Date.now() }, row);
       if (res.data && res.data[0]) parkCoasters.push(res.data[0]);
+      addMyCoaster(savedRow); // always ADDS a new coaster to your list now — building again never overwrites an earlier one
+      lastSavedCoaster = savedRow;
       var builtInPark = builderReturnTo === "screen-park";
       pendingBuildX = null; pendingBuildY = null;
       if (builtInPark) {
@@ -1493,8 +1563,8 @@
       canvas.addEventListener("pointerleave", function () { dragging = false; });
     })();
 
-    document.getElementById("savedRideBtn").addEventListener("click", function () { beginRide(loadMyTrack(), 0, window.localStorage.getItem("coasterPartyMyTrackName") || "My Coaster", loadMyTrackLoops()); });
-    document.getElementById("savedHostBtn").addEventListener("click", function () { hostLiveRoom(loadMyTrack(), window.localStorage.getItem("coasterPartyMyTrackName") || "My Coaster", loadMyTrackLoops()); });
+    document.getElementById("savedRideBtn").addEventListener("click", function () { if (lastSavedCoaster) beginRide(lastSavedCoaster.heights, 0, lastSavedCoaster.name, lastSavedCoaster.loops); });
+    document.getElementById("savedHostBtn").addEventListener("click", function () { if (lastSavedCoaster) hostLiveRoom(lastSavedCoaster.heights, lastSavedCoaster.name, lastSavedCoaster.loops); });
     document.getElementById("savedHomeBtn").addEventListener("click", function () { showScreen("screen-home"); });
 
     document.getElementById("joinCancelBtn").addEventListener("click", function () { showScreen("screen-home"); });
